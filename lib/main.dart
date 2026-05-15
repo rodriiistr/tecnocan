@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-// import 'screens/splash_screen.dart';
-import './screens/home_screen.dart';
-// import './screens/presentation_screen.dart';
-// import './screens/mascota_screen.dart';
-// import 'screens/dispositivo_screen.dart';
+import 'screens/splash_screen.dart';
 
 
 void main() {
@@ -22,7 +18,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         fontFamily: "Montserrat"
       ),
-      home: HomeScreen(), // Desde acá empieza la app
+      home: SplashScreen(), // Desde acá empieza la app
     );
   }
 }

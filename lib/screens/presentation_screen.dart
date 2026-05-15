@@ -1,5 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:tecnocan/screens/login_screen.dart';
 
+// ─────────────────────────────────────────────
+// DATOS DE CADA PÁGINA — agrega, quita o edita aquí
+// ─────────────────────────────────────────────
+class _PageData {
+  final String title;
+  final String subtitle;
+  final String asset; // ruta en assets/
+  const _PageData({
+    required this.title,
+    required this.subtitle,
+    required this.asset,
+  });
+}
+
+const List<_PageData> _pages = [
+  _PageData(
+    title: 'Bienvenido a TecnoCan',
+    subtitle: 'Tecnología que cuida\na quienes más amas.',
+    asset: 'assets/logo.png',
+  ),
+  _PageData(
+    title: 'Monitorea en tiempo real',
+    subtitle: 'Sabe siempre dónde\nestá tu mascota.',
+    asset: 'assets/logo.png', // cambiar
+  ),
+  _PageData(
+    title: 'Alertas inteligentes',
+    subtitle: 'Recibe notificaciones\ncuando más importa.',
+    asset: 'assets/logo.png',
+  ),
+  _PageData(
+    title: 'Todo bajo control',
+    subtitle: 'Salud, ubicación y rutinas\nen un solo lugar.',
+    asset: 'assets/logo.png',
+  ),
+];
+
+// ─────────────────────────────────────────────
+// SCREEN
+// ─────────────────────────────────────────────
 class PresentationScreen extends StatefulWidget {
   const PresentationScreen({super.key});
 
@@ -9,9 +50,12 @@ class PresentationScreen extends StatefulWidget {
 
 class _PresentationScreenState extends State<PresentationScreen>
     with TickerProviderStateMixin {
+  late final PageController _pageController;
+  int _currentPage = 0;
+
+  // Animaciones por página
   late AnimationController _logoController;
   late AnimationController _textController;
-  late AnimationController _dotsController;
   late AnimationController _buttonController;
   late AnimationController _floatingController;
 
@@ -23,12 +67,20 @@ class _PresentationScreenState extends State<PresentationScreen>
   late Animation<Offset> _buttonSlide;
   late Animation<double> _floatingAnim;
 
-  final int _currentPage = 0;
+  bool get _isLastPage => _currentPage == _pages.length - 1;
 
   @override
   void initState() {
     super.initState();
 
+    _pageController = PageController();
+    _pageController.addListener(_onPageChanged);
+
+    _initAnimationControllers();
+    _startAnimations();
+  }
+
+  void _initAnimationControllers() {
     _floatingController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -63,11 +115,6 @@ class _PresentationScreenState extends State<PresentationScreen>
       CurvedAnimation(parent: _textController, curve: Curves.easeOut),
     );
 
-    _dotsController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-
     _buttonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -81,26 +128,55 @@ class _PresentationScreenState extends State<PresentationScreen>
     ).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeOut),
     );
+  }
 
-    _startAnimations();
+  void _onPageChanged() {
+    final page = _pageController.page?.round() ?? 0;
+    if (page != _currentPage) {
+      setState(() => _currentPage = page);
+      _replayAnimations();
+    }
   }
 
   Future<void> _startAnimations() async {
     await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
     _logoController.forward();
     await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
     _textController.forward();
-    await Future.delayed(const Duration(milliseconds: 300));
-    _dotsController.forward();
     await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
     _buttonController.forward();
+  }
+
+  Future<void> _replayAnimations() async {
+    _logoController.reset();
+    _textController.reset();
+    _buttonController.reset();
+    await _startAnimations();
+  }
+
+  void _goToNextPage() {
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _goToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_onPageChanged);
+    _pageController.dispose();
     _logoController.dispose();
     _textController.dispose();
-    _dotsController.dispose();
     _buttonController.dispose();
     _floatingController.dispose();
     super.dispose();
@@ -117,54 +193,92 @@ class _PresentationScreenState extends State<PresentationScreen>
             child: Column(
               children: [
                 const Spacer(flex: 2),
-                // Logo
-                FadeTransition(
-                  opacity: _logoFade,
-                  child: ScaleTransition(
-                    scale: _logoScale,
-                    child: AnimatedBuilder(
-                      animation: _floatingAnim,
-                      builder: (context, child) {
-                        return Transform.translate(
-                          offset: Offset(0, -_floatingAnim.value),
-                          child: child,
-                        );
-                      },
-                      child: _buildLogo(),
-                    ),
+
+                // ── Contenido deslizable ──
+                Expanded(
+                  flex: 6,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _pages.length,
+                    itemBuilder: (context, index) {
+                      final page = _pages[index];
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Logo / ilustración
+                          FadeTransition(
+                            opacity: _logoFade,
+                            child: ScaleTransition(
+                              scale: _logoScale,
+                              child: AnimatedBuilder(
+                                animation: _floatingAnim,
+                                builder: (context, child) => Transform.translate(
+                                  offset: Offset(0, -_floatingAnim.value),
+                                  child: child,
+                                ),
+                                child: Image.asset(
+                                  page.asset,
+                                  width: 200,
+                                  height: 180,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          // Título
+                          FadeTransition(
+                            opacity: _textFade,
+                            child: SlideTransition(
+                              position: _textSlide,
+                              child: Text(
+                                page.title,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A3E6E),
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Subtítulo
+                          FadeTransition(
+                            opacity: _textFade,
+                            child: SlideTransition(
+                              position: _textSlide,
+                              child: Text(
+                                page.subtitle,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFF5A6E85),
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
+
+                const Spacer(flex: 1),
+
+                // ── Dots ──
+                _buildPageDots(),
+
                 const SizedBox(height: 32),
-                // Nombre
-                FadeTransition(
-                  opacity: _textFade,
-                ),
-                const SizedBox(height: 16),
-                // Tagline
-                FadeTransition(
-                  opacity: _textFade,
-                  child: SlideTransition(
-                    position: _textSlide,
-                    child: const Text(
-                      'Tecnología que cuida\na quienes más amas.', // Eslogan
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w400,
-                        color: Color(0xFF5A6E85),
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(flex: 2),
-                // Dots
-                FadeTransition(
-                  opacity: _dotsController,
-                  child: _buildPageDots(),
-                ),
-                const SizedBox(height: 32),
-                // Botón
+
+                // ── Botón ──
                 FadeTransition(
                   opacity: _buttonFade,
                   child: SlideTransition(
@@ -172,11 +286,79 @@ class _PresentationScreenState extends State<PresentationScreen>
                     child: _buildButton(),
                   ),
                 ),
+
                 const SizedBox(height: 40),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPageDots() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(_pages.length, (index) {
+        final isActive = index == _currentPage;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          width: isActive ? 22 : 10,
+          height: 10,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            color: isActive
+                ? const Color(0xFF1A3E6E)
+                : const Color(0xFFBFCFDE),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: SizedBox(
+        width: double.infinity,
+        height: 58,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: ElevatedButton(
+            key: ValueKey(_isLastPage), // fuerza rebuild animado
+            onPressed: _isLastPage ? _goToLogin : _goToNextPage,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A3E6E),
+              foregroundColor: Colors.white,
+              elevation: 6,
+              shadowColor: const Color(0xFF1A3E6E).withOpacity(0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _isLastPage ? 'Iniciar sesión' : 'Siguiente',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(
+                  _isLastPage
+                      ? Icons.login_rounded
+                      : Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -232,7 +414,7 @@ class _PresentationScreenState extends State<PresentationScreen>
   }
 
   List<Widget> _buildFloatingDots() {
-    final dots = [
+    const dots = [
       _DotData(top: 120, right: 60, size: 10, opacity: 0.5),
       _DotData(top: 200, right: 120, size: 6, opacity: 0.3),
       _DotData(top: 340, left: 30, size: 7, opacity: 0.4),
@@ -249,12 +431,10 @@ class _PresentationScreenState extends State<PresentationScreen>
         right: d.right,
         child: AnimatedBuilder(
           animation: _floatingAnim,
-          builder: (context, child) {
-            return Transform.translate(
-              offset: Offset(0, -_floatingAnim.value * 0.5),
-              child: child,
-            );
-          },
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, -_floatingAnim.value * 0.5),
+            child: child,
+          ),
           child: Container(
             width: d.size,
             height: d.size,
@@ -266,73 +446,6 @@ class _PresentationScreenState extends State<PresentationScreen>
         ),
       );
     }).toList();
-  }
-
-  Widget _buildLogo() {
-    return Image.asset(
-      'assets/logo.png', // 👈 cambia esta ruta
-      width: 200,
-      height: 180,
-    );
-  }
-
-  Widget _buildPageDots() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(4, (index) {
-        final isActive = index == _currentPage;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 5),
-          width: isActive ? 22 : 10,
-          height: 10,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            color: isActive ? const Color(0xFF1A3E6E) : const Color(0xFFBFCFDE),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: SizedBox(
-        width: double.infinity,
-        height: 58,
-        child: ElevatedButton(
-          onPressed: () {
-            // TODO: navegar a la siguiente pantalla
-            // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A3E6E),
-            foregroundColor: Colors.white,
-            elevation: 6,
-            shadowColor: const Color(0xFF1A3E6E).withOpacity(0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Comenzar',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              SizedBox(width: 10),
-              Icon(Icons.arrow_forward_ios_rounded, size: 16),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

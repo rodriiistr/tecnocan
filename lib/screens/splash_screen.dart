@@ -1,60 +1,78 @@
 import 'package:flutter/material.dart';
-import 'package:tecnocan/screens/login_screen.dart';
-import 'dart:async';
-// import 'home_screen.dart';
+import 'package:tecnocan/screens/presentation_screen.dart';
+
+const Color _colorPrimary = Color(0xFF5DADE2);
+const Color _colorDark = Color(0xFF1B4F72);
+const Duration _animDuration = Duration(milliseconds: 1800);
 
 class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-
-  late AnimationController _controller;
-  late Animation<double> scaleAnimation;
-  late Animation<double> moveAnimation;
-  late Animation<double> textOpacity;
+  late final AnimationController _controller;
+  late final Animation<double> _logoScale;
+  late final Animation<double> _logoSlide;
+  late final Animation<double> _textOpacity;
+  late final Animation<Offset> _textSlide;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 2000),
-    );
+    _controller = AnimationController(vsync: this, duration: _animDuration);
 
-    scaleAnimation = Tween<double>(begin: 0.8, end: 1).animate(
+    _logoScale = Tween<double>(begin: 0.75, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Interval(0.0, 0.4, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.45, curve: Curves.elasticOut),
       ),
     );
 
-    moveAnimation = Tween<double>(begin: 0, end: -20).animate(
+    _logoSlide = Tween<double>(begin: 0.0, end: -22.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Interval(0.4, 1, curve: Curves.easeInOut),
+        curve: const Interval(0.4, 1.0, curve: Curves.easeInOutCubic),
       ),
     );
 
-    textOpacity = Tween<double>(begin: 0, end: 1).animate(
+    _textOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Interval(0.6, 1, curve: Curves.easeIn),
+        curve: const Interval(0.55, 1.0, curve: Curves.easeIn),
+      ),
+    );
+
+    _textSlide = Tween<Offset>(
+      begin: const Offset(0.15, 0),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
       ),
     );
 
     _controller.forward();
 
-    Timer(Duration(seconds: 3), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => LoginScreen()),
-      );
+    // Navega después de la animación + una pausa breve
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        Future.delayed(const Duration(milliseconds: 600), _goToLogin);
+      }
     });
+  }
+
+  void _goToLogin() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const PresentationScreen()),
+    );
   }
 
   @override
@@ -67,55 +85,31 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
-      // 👇 Esto garantiza centrado REAL
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (context, child) {
-
+          builder: (context, _) {
             return Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-
-                // 🔹 LOGO
+                // Logo animado
                 Transform.translate(
-                  offset: Offset(moveAnimation.value, 0),
+                  offset: Offset(_logoSlide.value, 0),
                   child: Transform.scale(
-                    scale: scaleAnimation.value,
-                    child: Image.asset(
-                      'assets/logo.png',
-                      width: 50,
-                    ),
+                    scale: _logoScale.value,
+                    child: Image.asset('assets/logo.png', width: 100),
                   ),
                 ),
 
-                // 🔹 TEXTO
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
 
-                Opacity(
-                  opacity: textOpacity.value,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Tecno",
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF5DADE2),
-                        ),
-                      ),
-                      Text(
-                        "Can",
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1B4F72),
-                        ),
-                      ),
-                    ],
+                // Texto animado con fade + slide
+                FadeTransition(
+                  opacity: _textOpacity,
+                  child: SlideTransition(
+                    position: _textSlide,
+                    child: const _BrandText(),
                   ),
                 ),
               ],
@@ -123,6 +117,23 @@ class _SplashScreenState extends State<SplashScreen>
           },
         ),
       ),
+    );
+  }
+}
+
+/// Widget separado para el texto de marca (stateless, más limpio)
+class _BrandText extends StatelessWidget {
+  const _BrandText();
+
+  @override
+  Widget build(BuildContext context) {
+    const style = TextStyle(fontSize: 26, fontWeight: FontWeight.bold);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Tecno', style: style.copyWith(color: _colorPrimary)),
+        Text('Can', style: style.copyWith(color: _colorDark)),
+      ],
     );
   }
 }
