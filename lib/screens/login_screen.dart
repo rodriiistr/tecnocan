@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tecnocan/screens/home_screen.dart';
+import 'package:tecnocan/screens/mascota_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen>
   void _goToHome() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const MascotaScreen()),
     );
   }
 

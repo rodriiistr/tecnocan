@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
 
 class DispositivoScreen extends StatefulWidget {
   const DispositivoScreen({super.key});
@@ -329,48 +330,87 @@ class _DispositivoScreenState extends State<DispositivoScreen>
       ),
     );
   }
-
+  
   // ─── Searching bar ────────────────────────────
   Widget _buildSearchingBar() {
     return Container(
       color: const Color(0xFFF5F8FC),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          RotationTransition(
-            turns: _spinAnim,
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF1A3E6E),
-                  width: 2.5,
-                ),
-              ),
-              child: Align(
-                alignment: Alignment.topCenter,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              RotationTransition(
+                turns: _spinAnim,
                 child: Container(
-                  width: 5,
-                  height: 5,
-                  margin: const EdgeInsets.only(top: 1),
-                  decoration: const BoxDecoration(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFF1A3E6E),
+                    border: Border.all(
+                      color: const Color(0xFF1A3E6E),
+                      width: 2.5,
+                    ),
+                  ),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.only(top: 1),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF1A3E6E),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+
+              const SizedBox(width: 12),
+
+              const Text(
+                'Buscando dispositivo...',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A3E6E),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          const Text(
-            'Buscando dispositivo...',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A3E6E),
+
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HomeScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A3E6E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'Siguiente',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],

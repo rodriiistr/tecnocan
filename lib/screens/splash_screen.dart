@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:tecnocan/screens/presentation_screen.dart';
 
-const Color _colorPrimary = Color(0xFF5DADE2);
-const Color _colorDark = Color(0xFF1B4F72);
+const Color _colorPrimary = Color(0xFF5A6E85);
+const Color _colorDark = Color(0xFF1A3E6E);
 const Duration _animDuration = Duration(milliseconds: 1800);
 
 class SplashScreen extends StatefulWidget {

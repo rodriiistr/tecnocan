@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'alimento_screen.dart';
 
 class MascotaScreen extends StatefulWidget {
   const MascotaScreen({super.key});
@@ -31,7 +32,8 @@ class _MascotaScreenState extends State<MascotaScreen>
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    ).animate(
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
   }
 
@@ -70,6 +72,29 @@ class _MascotaScreenState extends State<MascotaScreen>
         '${dt.year}';
   }
 
+  void _irASiguiente() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, animation, __) =>
+            const AlimentoScreen(),
+        transitionsBuilder: (_, animation, __, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 350),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,22 +111,13 @@ class _MascotaScreenState extends State<MascotaScreen>
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 12),
-                            // Back button
-                            GestureDetector(
-                              onTap: () => Navigator.pop(context),
-                              child: const Icon(
-                                Icons.arrow_back,
-                                color: Color(0xFF1A3E6E),
-                                size: 26,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            // Título
+                            const SizedBox(height: 20),
+                            // Título (sin flecha)
                             const Center(
                               child: Text(
                                 'Agrega a tu\nmascota',
@@ -125,10 +141,8 @@ class _MascotaScreenState extends State<MascotaScreen>
                               ),
                             ),
                             const SizedBox(height: 28),
-                            // Avatar
                             Center(child: _buildAvatar()),
                             const SizedBox(height: 32),
-                            // Nombre
                             _buildLabel('Nombre'),
                             const SizedBox(height: 8),
                             _buildTextField(
@@ -136,7 +150,6 @@ class _MascotaScreenState extends State<MascotaScreen>
                               hint: 'Ej. Max',
                             ),
                             const SizedBox(height: 20),
-                            // Raza
                             _buildLabel('Raza'),
                             const SizedBox(height: 8),
                             _buildTextField(
@@ -144,12 +157,10 @@ class _MascotaScreenState extends State<MascotaScreen>
                               hint: 'Ej. Golden Retriever',
                             ),
                             const SizedBox(height: 20),
-                            // Fecha de nacimiento
                             _buildLabel('Fecha de nacimiento'),
                             const SizedBox(height: 8),
                             _buildDateField(),
                             const SizedBox(height: 20),
-                            // Sexo
                             _buildLabel('Sexo'),
                             const SizedBox(height: 8),
                             _buildSexoSelector(),
@@ -158,7 +169,6 @@ class _MascotaScreenState extends State<MascotaScreen>
                         ),
                       ),
                     ),
-                    // Botón + dots
                     _buildBottom(),
                   ],
                 ),
@@ -174,7 +184,6 @@ class _MascotaScreenState extends State<MascotaScreen>
   Widget _buildBackground() {
     return Stack(
       children: [
-        // Arco top-right
         Positioned(
           top: -60,
           right: -80,
@@ -190,7 +199,6 @@ class _MascotaScreenState extends State<MascotaScreen>
             ),
           ),
         ),
-        // Blob bottom-left
         Positioned(
           bottom: -40,
           left: -50,
@@ -203,22 +211,9 @@ class _MascotaScreenState extends State<MascotaScreen>
             ),
           ),
         ),
-        // Dots decorativos
-        Positioned(
-          top: 130,
-          left: 28,
-          child: _dot(8, 0.5),
-        ),
-        Positioned(
-          top: 260,
-          right: 32,
-          child: _dot(12, 0.6),
-        ),
-        Positioned(
-          top: 180,
-          right: 60,
-          child: _dot(6, 0.3),
-        ),
+        Positioned(top: 130, left: 28, child: _dot(8, 0.5)),
+        Positioned(top: 260, right: 32, child: _dot(12, 0.6)),
+        Positioned(top: 180, right: 60, child: _dot(6, 0.3)),
       ],
     );
   }
@@ -248,7 +243,7 @@ class _MascotaScreenState extends State<MascotaScreen>
           ),
           child: ClipOval(
             child: Image.asset(
-              'assets/mascota_placeholder.png', // 👈 cambia esta ruta
+              'assets/mascota_placeholder.png',
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => const Icon(
                 Icons.pets,
@@ -258,14 +253,11 @@ class _MascotaScreenState extends State<MascotaScreen>
             ),
           ),
         ),
-        // Botón cámara
         Positioned(
           bottom: 0,
           right: -8,
           child: GestureDetector(
-            onTap: () {
-              // TODO: abrir galería/cámara
-            },
+            onTap: () {},
             child: Container(
               width: 38,
               height: 38,
@@ -425,7 +417,7 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Bottom (botón + dots) ────────────────────
+  // ─── Bottom (Siguiente + dots) ────────────────
   Widget _buildBottom() {
     return Container(
       color: const Color(0xFFF5F8FC),
@@ -436,29 +428,35 @@ class _MascotaScreenState extends State<MascotaScreen>
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: guardar y continuar
-              },
+              onPressed: _irASiguiente,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A3E6E),
                 foregroundColor: Colors.white,
                 elevation: 4,
-                shadowColor: const Color(0xFF1A3E6E).withOpacity(0.4),
+                shadowColor:
+                    const Color(0xFF1A3E6E).withOpacity(0.4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Text(
-                'Guardar y continuar',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Siguiente',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded, size: 20),
+                ],
               ),
             ),
           ),
           const SizedBox(height: 20),
-          // Dots de progreso
+          // Dots de progreso — paso 1 de 4
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {
