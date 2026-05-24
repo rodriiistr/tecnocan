@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+// import 'package:drift/drift.dart' show Value;
+import 'package:tecnocan/data/app_database.dart';
+import 'package:tecnocan/data/database_provider.dart';
 import 'alimento_screen.dart';
 
 class MascotaScreen extends StatefulWidget {
-  const MascotaScreen({super.key});
+  final int userId;
+  const MascotaScreen({super.key, required this.userId});
 
   @override
   State<MascotaScreen> createState() => _MascotaScreenState();
@@ -13,7 +17,8 @@ class _MascotaScreenState extends State<MascotaScreen>
   final _nombreController = TextEditingController();
   final _razaController = TextEditingController();
   DateTime? _fechaNacimiento;
-  String? _sexo; // 'macho' | 'hembra'
+  String? _sexo;
+  bool _isLoading = false;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -72,12 +77,41 @@ class _MascotaScreenState extends State<MascotaScreen>
         '${dt.year}';
   }
 
-  void _irASiguiente() {
+  Future<void> _irASiguiente() async {
+    if (_nombreController.text.trim().isEmpty ||
+        _razaController.text.trim().isEmpty ||
+        _fechaNacimiento == null ||
+        _sexo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor completa todos los campos'),
+          backgroundColor: Color(0xFF1A3E6E),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final db = DatabaseProvider.of(context);
+    final petId = await db.createPet(PetsCompanion.insert(
+      userId: widget.userId,
+      name: _nombreController.text.trim(),
+      breed: _razaController.text.trim(),
+      birthDate: _fechaNacimiento!.millisecondsSinceEpoch,
+      sex: _sexo!,
+    ));
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, animation, __) =>
-            const AlimentoScreen(),
+        pageBuilder: (_, animation, __) => AlimentoScreen(
+          userId: widget.userId,
+          petId: petId,
+        ),
         transitionsBuilder: (_, animation, __, child) {
           return SlideTransition(
             position: Tween<Offset>(
@@ -117,7 +151,6 @@ class _MascotaScreenState extends State<MascotaScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 20),
-                            // Título (sin flecha)
                             const Center(
                               child: Text(
                                 'Agrega a tu\nmascota',
@@ -180,7 +213,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Background ───────────────────────────────
   Widget _buildBackground() {
     return Stack(
       children: [
@@ -229,7 +261,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Avatar ───────────────────────────────────
   Widget _buildAvatar() {
     return Stack(
       clipBehavior: Clip.none,
@@ -277,7 +308,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Label ────────────────────────────────────
   Widget _buildLabel(String text) {
     return Text(
       text,
@@ -289,7 +319,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── TextField ────────────────────────────────
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
@@ -321,7 +350,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Date Field ───────────────────────────────
   Widget _buildDateField() {
     return GestureDetector(
       onTap: _seleccionarFecha,
@@ -358,7 +386,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Sexo Selector ────────────────────────────
   Widget _buildSexoSelector() {
     return Row(
       children: [
@@ -417,7 +444,6 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
-  // ─── Bottom (Siguiente + dots) ────────────────
   Widget _buildBottom() {
     return Container(
       color: const Color(0xFFF5F8FC),
@@ -428,7 +454,7 @@ class _MascotaScreenState extends State<MascotaScreen>
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: _irASiguiente,
+              onPressed: _isLoading ? null : _irASiguiente,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A3E6E),
                 foregroundColor: Colors.white,
@@ -439,24 +465,32 @@ class _MascotaScreenState extends State<MascotaScreen>
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Siguiente',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Siguiente',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_rounded, size: 20),
+                      ],
                     ),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, size: 20),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 20),
-          // Dots de progreso — paso 1 de 4
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {

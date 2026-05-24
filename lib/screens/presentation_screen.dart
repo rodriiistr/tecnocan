@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tecnocan/screens/login_screen.dart';
+import 'package:tecnocan/screens/signup_screen.dart';
 
 // ─────────────────────────────────────────────
 // DATOS DE CADA PÁGINA — agrega, quita o edita aquí
@@ -167,7 +167,7 @@ class _PresentationScreenState extends State<PresentationScreen>
   void _goToLogin() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const SignupScreen()),
     );
   }
 
@@ -341,7 +341,7 @@ class _PresentationScreenState extends State<PresentationScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  _isLastPage ? 'Iniciar sesión' : 'Siguiente',
+                  _isLastPage ? 'Registrarse' : 'Siguiente',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,

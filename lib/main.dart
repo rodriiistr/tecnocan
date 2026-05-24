@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'screens/splash_screen.dart';
 
+// IMPORTS DE DRIFT
+import 'data/app_database.dart';
+import 'data/database_provider.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final db = AppDatabase();
+
+  runApp(
+    DatabaseProvider(
+      db: db,
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -15,10 +27,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Mi App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        fontFamily: "Montserrat"
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+        ),
+        fontFamily: "Montserrat",
       ),
-      home: SplashScreen(), // Desde acá empieza la app
+      home: SplashScreen(),
     );
   }
 }

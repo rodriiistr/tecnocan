@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:drift/drift.dart' show Value;
+import 'package:tecnocan/data/app_database.dart';
+import 'package:tecnocan/data/database_provider.dart';
 import 'dispositivo_screen.dart';
 
 class AlimentoScreen extends StatefulWidget {
-  const AlimentoScreen({super.key});
+  final int userId;
+  final int petId;
+  
+  const AlimentoScreen({
+    super.key,
+    required this.userId,
+    required this.petId,
+  });
 
   @override
   State<AlimentoScreen> createState() => _AlimentoScreenState();
@@ -13,6 +23,7 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     with SingleTickerProviderStateMixin {
   int _frecuencia = 3;
   final List<_HorarioEntry> _horarios = [];
+  bool _isLoading = false;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -24,7 +35,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
   static const Color _gray = Color(0xFF7A90A8);
   static const Color _border = Color(0xFFDDE6EF);
 
-  // Nombres predeterminados sugeridos
   static const List<String> _nombresSugeridos = [
     'Desayuno', 'Almuerzo', 'Cena', 'Snack',
     'Merienda', 'Toma extra',
@@ -74,7 +84,50 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     super.dispose();
   }
 
-  // ── Editar hora con TimePicker ─────────────────
+  Future<void> _guardarYContinuar() async {
+    setState(() => _isLoading = true);
+
+    final db = DatabaseProvider.of(context);
+
+    // 1. Crear el schedule
+    final scheduleId = await db.createSchedule(
+      FeedingSchedulesCompanion.insert(
+        petId: widget.petId,
+        frequency: _frecuencia,
+        createdAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+
+    // 2. Crear horarios
+    final times = _horarios.map((h) {
+      final hh = h.hora.hour.toString().padLeft(2, '0');
+      final mm = h.hora.minute.toString().padLeft(2, '0');
+
+      return FeedingTimesCompanion.insert(
+        scheduleId: scheduleId,
+        name: h.nombre,
+        time: '$hh:$mm',
+        amount: h.gramos.toDouble(),
+      );
+    }).toList();
+
+    await db.insertFeedingTimes(times);
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DispositivoScreen(
+          petId: widget.petId,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   Future<void> _editarHora(int index) async {
     final picked = await showTimePicker(
       context: context,
@@ -92,7 +145,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     if (picked != null) setState(() => _horarios[index].hora = picked);
   }
 
-  // ── Editar nombre con bottom sheet ────────────
   void _editarNombre(int index) {
     final ctrl = TextEditingController(text: _horarios[index].nombre);
     showModalBottomSheet(
@@ -112,7 +164,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 40, height: 4,
@@ -127,7 +178,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                   style: TextStyle(
                       fontSize: 17, fontWeight: FontWeight.w800, color: _navy)),
               const SizedBox(height: 14),
-              // TextField personalizado
               TextField(
                 controller: ctrl,
                 autofocus: true,
@@ -145,17 +195,15 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                     borderSide: BorderSide.none,
                   ),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear_rounded,
-                        size: 18, color: _gray),
+                    icon: const Icon(Icons.clear_rounded, size: 18, color: _gray),
                     onPressed: () => ctrl.clear(),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              // Chips de sugerencias
               const Text('Sugerencias',
-                  style: TextStyle(fontSize: 12, color: _gray,
-                      fontWeight: FontWeight.w600)),
+                  style: TextStyle(
+                      fontSize: 12, color: _gray, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -210,10 +258,8 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ── Editar gramos con bottom sheet ────────────
   void _editarGramos(int index) {
-    final ctrl = TextEditingController(
-        text: _horarios[index].gramos.toString());
+    final ctrl = TextEditingController(text: _horarios[index].gramos.toString());
     int tempGramos = _horarios[index].gramos;
 
     showModalBottomSheet(
@@ -234,7 +280,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle
                 Center(
                   child: Container(
                     width: 40, height: 4,
@@ -251,7 +296,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                         fontWeight: FontWeight.w800,
                         color: _navy)),
                 const SizedBox(height: 20),
-                // Stepper grande
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -265,7 +309,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                       },
                     ),
                     const SizedBox(width: 16),
-                    // Input directo
                     SizedBox(
                       width: 110,
                       child: TextField(
@@ -314,7 +357,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Chips rápidos
                 Center(
                   child: Wrap(
                     spacing: 8,
@@ -351,11 +393,10 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                   child: ElevatedButton(
                     onPressed: () {
                       final parsed = int.tryParse(ctrl.text);
-                      setState(() =>
-                          _horarios[index].gramos =
-                              (parsed != null && parsed > 0)
-                                  ? parsed
-                                  : tempGramos);
+                      setState(() => _horarios[index].gramos =
+                          (parsed != null && parsed > 0)
+                              ? parsed
+                              : tempGramos);
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
@@ -440,7 +481,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ─── Background ───────────────────────────────
   Widget _buildBackground() {
     return Stack(
       children: [
@@ -482,7 +522,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
         ),
       );
 
-  // ─── Header ───────────────────────────────────
   Widget _buildHeader() {
     return Row(
       children: [
@@ -513,7 +552,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ─── Bowl Icon ────────────────────────────────
   Widget _buildBowlIcon() {
     return Center(
       child: Container(
@@ -529,7 +567,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ─── Frecuencia ───────────────────────────────
   Widget _buildFrecuenciaSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,7 +652,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ─── Horario Card ─────────────────────────────
   Widget _buildHorarioCard(int index, _HorarioEntry entry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -628,7 +664,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            // ── Hora (tappable) ──
             GestureDetector(
               onTap: () => _editarHora(index),
               child: Container(
@@ -650,18 +685,16 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                     ),
                     Text(_ampm(entry.hora),
                         style: const TextStyle(
-                            fontSize: 10, color: _gray,
+                            fontSize: 10,
+                            color: _gray,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    const Icon(Icons.edit_rounded,
-                        size: 10, color: _gray),
+                    const Icon(Icons.edit_rounded, size: 10, color: _gray),
                   ],
                 ),
               ),
             ),
             const SizedBox(width: 12),
-
-            // ── Nombre (tappable) ──
             Expanded(
               child: GestureDetector(
                 onTap: () => _editarNombre(index),
@@ -684,21 +717,17 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                               color: _navy),
                         ),
                       ),
-                      const Icon(Icons.edit_rounded,
-                          size: 12, color: _gray),
+                      const Icon(Icons.edit_rounded, size: 12, color: _gray),
                     ],
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-
-            // ── Gramos ──
             GestureDetector(
               onTap: () => _editarGramos(index),
               child: Row(
                 children: [
-                  // Botón −
                   _SmallStepBtn(
                     icon: Icons.remove_rounded,
                     onTap: () {
@@ -708,7 +737,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                     },
                   ),
                   const SizedBox(width: 6),
-                  // Valor (tappable abre sheet)
                   Container(
                     constraints: const BoxConstraints(minWidth: 48),
                     padding: const EdgeInsets.symmetric(
@@ -727,7 +755,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // Botón +
                   _SmallStepBtn(
                     icon: Icons.add_rounded,
                     onTap: () => setState(() => entry.gramos += 10),
@@ -741,7 +768,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ─── Label ────────────────────────────────────
   Widget _buildLabel(String text) {
     return Text(
       text,
@@ -753,7 +779,6 @@ class _AlimentoScreenState extends State<AlimentoScreen>
     );
   }
 
-  // ─── Bottom ───────────────────────────────────
   Widget _buildBottom() {
     return Container(
       color: _bg,
@@ -762,14 +787,7 @@ class _AlimentoScreenState extends State<AlimentoScreen>
         width: double.infinity,
         height: 56,
         child: ElevatedButton(
-          onPressed: () {
-            // Guardar y volver a Home
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const DispositivoScreen()),
-              (route) => false,
-            );
-          },
+          onPressed: _isLoading ? null : _guardarYContinuar,
           style: ElevatedButton.styleFrom(
             backgroundColor: _navy,
             foregroundColor: Colors.white,
@@ -779,17 +797,25 @@ class _AlimentoScreenState extends State<AlimentoScreen>
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          child: const Text(
-            'Guardar',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-          ),
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text(
+                  'Guardar',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                ),
         ),
       ),
     );
   }
 }
 
-// ─── Data class ───────────────────────────────
 class _HorarioEntry {
   TimeOfDay hora;
   String nombre;
@@ -801,7 +827,6 @@ class _HorarioEntry {
   });
 }
 
-// ─── Small inline +/- button ──────────────────
 class _SmallStepBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -823,7 +848,6 @@ class _SmallStepBtn extends StatelessWidget {
   }
 }
 
-// ─── Big stepper button (inside bottom sheet) ─
 class _BigStepBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;

@@ -1,68 +1,36 @@
 import 'package:flutter/material.dart';
-// import 'dart:math' as math;
 import 'dart:async';
-
+import 'package:tecnocan/data/app_database.dart';
+import 'package:tecnocan/data/database_provider.dart';
 import 'package:tecnocan/screens/deposito_screen.dart';
 import 'package:tecnocan/screens/perfil_screen.dart';
 import 'perfil_mascota_screen.dart';
+import 'dart:ui';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int userId;
+  const HomeScreen({super.key, required this.userId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentTab = 0;
   late Timer _timer;
-  String _countdown = '';
+  String _countdown = '--:--';
 
-  // Datos simulados
-  final List<_MealSchedule> _schedules = [
-    _MealSchedule(hour: 8, minute: 0, label: 'Desayuno', grams: 100, done: true, enabled: true),
-    _MealSchedule(hour: 13, minute: 0, label: 'Almuerzo', grams: 100, done: true, enabled: true),
-    _MealSchedule(hour: 18, minute: 0, label: 'Cena', grams: 120, done: false, enabled: true),
-  ];
+  // Datos de BD
+  Pet? _pet;
+  List<FeedingTime> _feedingTimes = [];
+  bool _isLoading = true;
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))..forward();
-    _slideController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..forward();
-    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
-
-    _updateCountdown();
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _updateCountdown());
-  }
-
-  void _updateCountdown() {
-    final now = DateTime.now();
-    final target = DateTime(now.year, now.month, now.day, 18, 0);
-    Duration diff = target.difference(now);
-    if (diff.isNegative) diff += const Duration(hours: 24);
-    final h = diff.inHours;
-    final m = diff.inMinutes % 60;
-    setState(() => _countdown = '$h:${m.toString().padLeft(2, '0')}');
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
-    _timer.cancel();
-    super.dispose();
-  }
-
-  // ─────────────────────────────── PALETTE ───────────────────────────────
+  // ─── PALETTE ───────────────────────────────────────────────────────────
   static const Color _navy = Color(0xFF1A3E6E);
   static const Color _navy2 = Color(0xFF1A3E6E);
   static const Color _navyLight = Color(0xFFE8F0F8);
@@ -74,7 +42,136 @@ class _HomeScreenState extends State<HomeScreen>
   static const Color _white = Colors.white;
 
   @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600))
+      ..forward();
+    _slideController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700))
+      ..forward();
+    _fadeAnim =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _slideAnim =
+        Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+            CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
+
+    _timer = Timer.periodic(
+        const Duration(minutes: 1), (_) => _updateCountdown());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    final db = DatabaseProvider.of(context);
+
+    final pets = await db.getPetsForUser(widget.userId);
+    if (pets.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    final pet = pets.first;
+
+    final schedule = await db.getScheduleForPet(pet.id);
+    List<FeedingTime> times = [];
+    if (schedule != null) {
+      times = await db.getTimesForSchedule(schedule.id);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _pet = pet;
+      _feedingTimes = times;
+      _isLoading = false;
+    });
+
+    _updateCountdown();
+  }
+
+  void _updateCountdown() {
+    final now = DateTime.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+
+    FeedingTime? next;
+    int minDiff = 99999;
+
+    for (final t in _feedingTimes) {
+      final parts = t.time.split(':');
+      final tMinutes =
+          int.parse(parts[0]) * 60 + int.parse(parts[1]);
+      final diff = tMinutes > nowMinutes
+          ? tMinutes - nowMinutes
+          : tMinutes + 1440 - nowMinutes;
+      if (diff < minDiff) {
+        minDiff = diff;
+        next = t;
+      }
+    }
+
+    if (next == null) {
+      if (mounted) setState(() => _countdown = '--:--');
+      return;
+    }
+
+    final h = minDiff ~/ 60;
+    final m = minDiff % 60;
+    if (mounted) {
+      setState(() => _countdown = '$h:${m.toString().padLeft(2, '0')}');
+    }
+  }
+
+  FeedingTime? get _nextMeal {
+    final now = DateTime.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    FeedingTime? next;
+    int minDiff = 99999;
+    for (final t in _feedingTimes) {
+      final parts = t.time.split(':');
+      final tMinutes = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+      final diff = tMinutes > nowMinutes
+          ? tMinutes - nowMinutes
+          : tMinutes + 1440 - nowMinutes;
+      if (diff < minDiff) {
+        minDiff = diff;
+        next = t;
+      }
+    }
+    return next;
+  }
+
+  String _petSubtitle(Pet pet) {
+    final breed = pet.breed;
+    final birth = DateTime.fromMillisecondsSinceEpoch(pet.birthDate);
+    final age = DateTime.now().difference(birth).inDays ~/ 365;
+    final ageStr = age == 1 ? '1 año' : '$age años';
+    return '$breed · $ageStr';
+  }
+
+  String _totalGramsToday() {
+    final total =
+        _feedingTimes.fold<double>(0, (sum, t) => sum + t.amount);
+    return '${total.toInt()}g';
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF2F6FB),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF1A3E6E)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bg,
       body: FadeTransition(
@@ -88,16 +185,12 @@ class _HomeScreenState extends State<HomeScreen>
                   index: _currentTab,
                   children: [
                     _buildHomeContent(),
-
                     const MascotaPerfilScreen(),
-
                     const DepositoScreen(),
-
-                    const PerfilScreen()
+                    const PerfilScreen(),
                   ],
                 ),
               ),
-
               _buildBottomNav(),
             ],
           ),
@@ -107,24 +200,24 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildHomeContent() {
-  return SingleChildScrollView(
-    child: Column(
-      children: [
-        _buildStatusAndHeader(),
-        _buildPetCard(),
-        const SizedBox(height: 16),
-        _buildNextMeal(),
-        const SizedBox(height: 16),
-        _buildScheduleSection(),
-        const SizedBox(height: 16),
-        _buildStatsRow(),
-        const SizedBox(height: 16),
-        _buildDispenseButton(),
-        const SizedBox(height: 20),
-      ],
-    ),
-  );
-}
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildStatusAndHeader(),
+          _buildPetCard(),
+          const SizedBox(height: 16),
+          _buildNextMeal(),
+          const SizedBox(height: 16),
+          _buildScheduleSection(),
+          const SizedBox(height: 16),
+          _buildStatsRow(),
+          const SizedBox(height: 16),
+          _buildDispenseButton(),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
 
   // ─── STATUS + HEADER ──────────────────────────────────────────────────
   Widget _buildStatusAndHeader() {
@@ -138,24 +231,24 @@ class _HomeScreenState extends State<HomeScreen>
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
-                    'Hola, Andrés 👋',
-                    style: TextStyle(
+                    _pet != null ? 'Hola 👋' : 'Bienvenido',
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: _navy,
                     ),
                   ),
-                  SizedBox(height: 3),
-                  Text(
+                  const SizedBox(height: 3),
+                  const Text(
                     'Aquí está el resumen de hoy',
                     style: TextStyle(fontSize: 13, color: _gray),
                   ),
                 ],
               ),
             ),
-            _NotifButton(),
+            const _NotifButton(),
           ],
         ),
       ),
@@ -182,14 +275,14 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           Row(
             children: [
-              // Avatar
               Container(
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withOpacity(0.12),
-                  border: Border.all(color: Colors.white.withOpacity(0.25), width: 2.5),
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.25), width: 2.5),
                 ),
                 child: ClipOval(
                   child: Image.asset(
@@ -206,22 +299,29 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Max',
-                        style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white)),
-                    const Text('Golden Retriever · 3 años',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white54)),
+                    Text(
+                      _pet?.name ?? 'Sin mascota',
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
+                    ),
+                    Text(
+                      _pet != null ? _petSubtitle(_pet!) : '',
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.white54),
+                    ),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        _PetBadge(label: 'Dispensador activo', color: _green),
-                        _PetBadge(label: '3 tomas hoy', color: _accent),
+                        _PetBadge(
+                            label: 'Dispensador activo', color: _green),
+                        _PetBadge(
+                          label: '${_feedingTimes.length} tomas hoy',
+                          color: _accent,
+                        ),
                       ],
                     ),
                   ],
@@ -230,12 +330,12 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
           const SizedBox(height: 16),
-          // Stats Row
           Row(
             children: [
-              _PetStat(value: '320g', label: 'Hoy total'),
-              _PetStat(value: '3/3', label: 'Tomas'),
-              _PetStat(value: '2.1kg', label: 'En tolva'),
+              _PetStat(value: _totalGramsToday(), label: 'Hoy total'),
+              _PetStat(
+                  value: '0/${_feedingTimes.length}', label: 'Tomas'),
+              const _PetStat(value: '2.1kg', label: 'En tolva'),
             ],
           ),
         ],
@@ -245,6 +345,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // ─── NEXT MEAL ────────────────────────────────────────────────────────
   Widget _buildNextMeal() {
+    final next = _nextMeal;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -284,22 +385,29 @@ class _HomeScreenState extends State<HomeScreen>
                               color: _gray,
                               letterSpacing: 0.6)),
                       const SizedBox(height: 2),
-                      const Text('Cena — 120g',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: _navy)),
+                      Text(
+                        next != null
+                            ? '${next.name} — ${next.amount.toInt()}g'
+                            : 'Sin tomas programadas',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: _navy),
+                      ),
                       const SizedBox(height: 2),
-                      const Text('Programada · 6:00 PM',
-                          style: TextStyle(fontSize: 12, color: _gray)),
+                      Text(
+                        next != null ? 'Programada · ${next.time}' : '',
+                        style: const TextStyle(
+                            fontSize: 12, color: _gray),
+                      ),
                       const SizedBox(height: 8),
-                      // Progress bar
                       ClipRRect(
                         borderRadius: BorderRadius.circular(50),
                         child: LinearProgressIndicator(
                           value: 0.68,
                           backgroundColor: _navyLight,
-                          valueColor: const AlwaysStoppedAnimation(_navy2),
+                          valueColor:
+                              const AlwaysStoppedAnimation(_navy2),
                           minHeight: 5,
                         ),
                       ),
@@ -310,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Column(
                   children: [
                     Text(
-                      _countdown.isNotEmpty ? _countdown : '--:--',
+                      _countdown,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -332,6 +440,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   // ─── SCHEDULE ─────────────────────────────────────────────────────────
   Widget _buildScheduleSection() {
+    final now = DateTime.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -344,7 +455,8 @@ class _HomeScreenState extends State<HomeScreen>
               GestureDetector(
                 onTap: () {},
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: _navyLight,
                     borderRadius: BorderRadius.circular(10),
@@ -365,12 +477,38 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
           const SizedBox(height: 10),
-          ..._schedules.asMap().entries.map((e) => _ScheduleItem(
-                schedule: e.value,
-                isNext: !e.value.done && e.value.enabled,
+          if (_feedingTimes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'No hay horarios configurados',
+                  style: TextStyle(color: _gray, fontSize: 14),
+                ),
+              ),
+            )
+          else
+            ..._feedingTimes.map((t) {
+              final parts = t.time.split(':');
+              final tMinutes =
+                  int.parse(parts[0]) * 60 + int.parse(parts[1]);
+              final isPast = tMinutes < nowMinutes;
+              final isNext = t.id == _nextMeal?.id;
+
+              return _ScheduleItem(
+                schedule: _MealSchedule(
+                  hour: int.parse(parts[0]),
+                  minute: int.parse(parts[1]),
+                  label: t.name,
+                  grams: t.amount.toInt(),
+                  done: isPast,
+                  enabled: true,
+                ),
+                isNext: isNext,
                 accentRed: _accentRed,
-                onToggle: (val) => setState(() => _schedules[e.key].enabled = val),
-              )),
+                onToggle: (_) {},
+              );
+            }),
         ],
       ),
     );
@@ -382,7 +520,6 @@ class _HomeScreenState extends State<HomeScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // Tolva
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -424,7 +561,8 @@ class _HomeScreenState extends State<HomeScreen>
                     child: LinearProgressIndicator(
                       value: 0.42,
                       backgroundColor: _navyLight,
-                      valueColor: const AlwaysStoppedAnimation(_navy2),
+                      valueColor:
+                          const AlwaysStoppedAnimation(_navy2),
                       minHeight: 5,
                     ),
                   ),
@@ -433,7 +571,6 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const SizedBox(width: 10),
-          // Racha
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -446,15 +583,14 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   const Text('🔥', style: TextStyle(fontSize: 22)),
                   const SizedBox(height: 6),
-                  const Text(
-                    '7',
-                    style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white),
-                  ),
+                  const Text('7',
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
                   const Text('Días en racha',
-                      style: TextStyle(fontSize: 11, color: Colors.white54)),
+                      style:
+                          TextStyle(fontSize: 11, color: Colors.white54)),
                   const SizedBox(height: 8),
                   Row(
                     children: List.generate(
@@ -479,13 +615,12 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-   // ─── DISPENSE BUTTONS ─────────────────────────────────────────────────
+  // ─── DISPENSE BUTTONS ─────────────────────────────────────────────────
   Widget _buildDispenseButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // ─── BOTÓN ALIMENTO ─────────────────────────────
           Expanded(
             child: GestureDetector(
               onTap: () => _showDispenseDialog('food'),
@@ -511,24 +646,19 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     Text('🍖', style: TextStyle(fontSize: 22)),
                     SizedBox(width: 8),
-                    Text(
-                      'Alimento',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
+                    Text('Alimento',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                        )),
                   ],
                 ),
               ),
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // ─── BOTÓN AGUA ─────────────────────────────
           Expanded(
             child: GestureDetector(
               onTap: () => _showDispenseDialog('water'),
@@ -554,15 +684,13 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     Text('💧', style: TextStyle(fontSize: 22)),
                     SizedBox(width: 8),
-                    Text(
-                      'Agua',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
+                    Text('Agua',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                        )),
                   ],
                 ),
               ),
@@ -575,7 +703,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _showDispenseDialog(String type) {
     final bool isFood = type == 'food';
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -589,82 +716,54 @@ class _HomeScreenState extends State<HomeScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-
             const SizedBox(height: 20),
-
             Text(
-              isFood
-                  ? 'Dispensar alimento'
-                  : 'Dispensar agua',
+              isFood ? 'Dispensar alimento' : 'Dispensar agua',
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: _navy,
-              ),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: _navy),
             ),
-
             const SizedBox(height: 8),
-
             Text(
               isFood
                   ? '¿Cuántos gramos deseas dispensar?'
                   : '¿Cuántos ml deseas dispensar?',
-              style: const TextStyle(
-                fontSize: 14,
-                color: _gray,
-              ),
+              style: const TextStyle(fontSize: 14, color: _gray),
             ),
-
             const SizedBox(height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: (isFood
-                      ? [50, 80, 100, 120]
-                      : [100, 200, 300, 500])
-                  .map((amount) {
+              children:
+                  (isFood ? [50, 80, 100, 120] : [100, 200, 300, 500])
+                      .map((amount) {
                 return GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-
-                    // Aquí mandas la acción
-                    print(
-                      '${isFood ? "Alimento" : "Agua"}: $amount',
-                    );
-                  },
+                  onTap: () => Navigator.pop(context),
                   child: Container(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 6),
+                    margin: const EdgeInsets.symmetric(horizontal: 6),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: _navyLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      isFood
-                          ? '${amount}g'
-                          : '${amount}ml',
+                      isFood ? '${amount}g' : '${amount}ml',
                       style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _navy2,
-                      ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _navy2),
                     ),
                   ),
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 16),
           ],
         ),
@@ -695,7 +794,8 @@ class _HomeScreenState extends State<HomeScreen>
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: tabs.asMap().entries.map((e) {
@@ -703,13 +803,11 @@ class _HomeScreenState extends State<HomeScreen>
               final tab = e.value;
               final active = _currentTab == i;
               return GestureDetector(
-                onTap: () {
-                  setState(() => _currentTab = i);
-                },
+                onTap: () => setState(() => _currentTab = i),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
                     color: active ? _navy : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
@@ -803,19 +901,13 @@ class _PetBadge extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-            ),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
           const SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
+                fontSize: 11, fontWeight: FontWeight.w600, color: color),
           ),
         ],
       ),
@@ -832,7 +924,8 @@ class _PetStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding:
+            const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.07),
           borderRadius: BorderRadius.circular(12),
@@ -889,7 +982,8 @@ class _ScheduleItem extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -911,7 +1005,9 @@ class _ScheduleItem extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
-                    color: isNext ? accentRed : const Color(0xFF0F2744),
+                    color: isNext
+                        ? accentRed
+                        : const Color(0xFF0F2744),
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -940,7 +1036,8 @@ class _ScheduleItem extends StatelessWidget {
                         color: Color(0xFF0F2744))),
                 const SizedBox(height: 2),
                 Text(subtitle,
-                    style: TextStyle(fontSize: 12, color: subtitleColor)),
+                    style:
+                        TextStyle(fontSize: 12, color: subtitleColor)),
               ],
             ),
           ),
@@ -971,7 +1068,8 @@ class _ScheduleItem extends StatelessWidget {
                         ? Alignment.centerRight
                         : Alignment.centerLeft,
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      margin:
+                          const EdgeInsets.symmetric(horizontal: 2),
                       width: 18,
                       height: 18,
                       decoration: const BoxDecoration(
@@ -1016,125 +1114,93 @@ class _NotifButton extends StatelessWidget {
               builder: (_) => Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 40,
-                      height: 4,
+                      width: 40, height: 4,
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
                     const Row(
                       children: [
-                        Icon(
-                          Icons.notifications_active_rounded,
-                          color: Color(0xFFFF6B35),
-                        ),
+                        Icon(Icons.notifications_active_rounded,
+                            color: Color(0xFFFF6B35)),
                         SizedBox(width: 10),
-                        Text(
-                          'Notificaciones',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F2744),
-                          ),
-                        ),
+                        Text('Notificaciones',
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F2744))),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-
                     _buildNotificationItem(
                       icon: Icons.restaurant_rounded,
                       title: 'Comida dispensada',
-                      subtitle: 'Max recibió 120g hace 5 min',
+                      subtitle: 'Tu mascota recibió su porción',
                     ),
-
                     _buildNotificationItem(
                       icon: Icons.water_drop_rounded,
                       title: 'Agua dispensada',
                       subtitle: 'Se dispensaron 300ml',
                     ),
-
                     _buildNotificationItem(
                       icon: Icons.warning_amber_rounded,
                       title: 'Tolva baja',
                       subtitle: 'Queda menos de 500g de alimento',
                     ),
-
                     const SizedBox(height: 10),
                   ],
                 ),
               ),
             );
           },
-
       child: Stack(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 42, height: 42,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color:
-                    const Color(0xFF1A3E6E).withOpacity(0.1),
-              ),
+                  color: const Color(0xFF1A3E6E).withOpacity(0.1)),
               boxShadow: [
                 BoxShadow(
-                  color:
-                      const Color(0xFF0F2744).withOpacity(0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
+                    color: const Color(0xFF0F2744).withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2)),
               ],
             ),
-            child: const Icon(
-              Icons.notifications_outlined,
-              color: Color(0xFF0F2744),
-              size: 20,
-            ),
+            child: const Icon(Icons.notifications_outlined,
+                color: Color(0xFF0F2744), size: 20),
           ),
-
-          // Badge
           if (notificationCount > 0)
             Positioned(
-              top: 6,
-              right: 6,
+              top: 6, right: 6,
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFFFF6B35),
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: Colors.white, width: 1.5),
                 ),
                 constraints: const BoxConstraints(
-                  minWidth: 18,
-                  minHeight: 18,
-                ),
+                    minWidth: 18, minHeight: 18),
                 child: Center(
                   child: Text(
                     '$notificationCount',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                    ),
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -1159,43 +1225,27 @@ class _NotifButton extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 42, height: 42,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF1A3E6E),
-            ),
+            child: Icon(icon, color: const Color(0xFF1A3E6E)),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F2744),
-                  ),
-                ),
-
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F2744))),
                 const SizedBox(height: 2),
-
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
