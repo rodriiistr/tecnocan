@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadData() async {
     final db = DatabaseProvider.of(context);
 
-    final user = await db.getUserById(widget.userId);
+    // final user = await db.getUserById(widget.userId);
     final pets = await db.getPetsForUser(widget.userId);
 
     if (pets.isEmpty) {
@@ -428,7 +428,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('SIGUIENTE TOMA',
+                      const Text('SIGUIENTE COMIDA',
                           style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -438,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Text(
                         next != null
                             ? '${next.name} — ${next.amount.toInt()}g'
-                            : 'Sin tomas programadas',
+                            : 'Sin comidas programadas',
                         style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

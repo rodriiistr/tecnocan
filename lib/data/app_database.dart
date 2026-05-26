@@ -46,8 +46,10 @@ class AppDatabase extends _$AppDatabase {
       (select(users)..where((u) => u.id.equals(id)))
           .getSingleOrNull();
 
-  Future<bool> updateUser(UsersCompanion user) =>
-      update(users).replace(user);
+  Future<void> updateUser(UsersCompanion user) async {
+    await (update(users)..where((u) => u.id.equals(user.id.value)))
+        .write(user);
+  }
 
   // ───────────────── PETS ─────────────────
 
