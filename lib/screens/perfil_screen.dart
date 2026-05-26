@@ -168,13 +168,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
                           const SizedBox(height: 14),
 
-                          // Ubicación (si existe)
-                          _buildInfoTile(
-                            Icons.location_on_outlined,
-                            'Ubicación',
-                            _user!.location ?? 'No registrada',
-                          ),
-
                           const SizedBox(height: 14),
 
                           // Mascotas registradas

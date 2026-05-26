@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
-// import 'package:drift/drift.dart' show Value;
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:tecnocan/data/app_database.dart';
 import 'package:tecnocan/data/database_provider.dart';
 import 'alimento_screen.dart';
@@ -19,6 +22,7 @@ class _MascotaScreenState extends State<MascotaScreen>
   DateTime? _fechaNacimiento;
   String? _sexo;
   bool _isLoading = false;
+  File? _imagenMascota;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -37,8 +41,7 @@ class _MascotaScreenState extends State<MascotaScreen>
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
   }
 
@@ -48,6 +51,166 @@ class _MascotaScreenState extends State<MascotaScreen>
     _razaController.dispose();
     _animController.dispose();
     super.dispose();
+  }
+
+  Future<void> _seleccionarFoto() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDE6EF),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Foto de tu mascota',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1A3E6E),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F0F8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt_outlined,
+                      color: Color(0xFF1A3E6E)),
+                ),
+                title: const Text('Tomar foto',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A3E6E))),
+                subtitle: const Text('Usa la cámara de tu dispositivo',
+                    style: TextStyle(color: Color(0xFF7A90A8), fontSize: 13)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F0F8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library_outlined,
+                      color: Color(0xFF1A3E6E)),
+                ),
+                title: const Text('Elegir de galería',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A3E6E))),
+                subtitle: const Text('Selecciona una foto existente',
+                    style: TextStyle(color: Color(0xFF7A90A8), fontSize: 13)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (_imagenMascota != null)
+                ListTile(
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEEEE),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent),
+                  ),
+                  title: const Text('Quitar foto',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.redAccent)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() => _imagenMascota = null);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    // Solicitar permiso según la fuente
+    final Permission permission =
+        source == ImageSource.camera ? Permission.camera : Permission.photos;
+
+    final status = await permission.request();
+
+    if (status.isDenied || status.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status.isPermanentlyDenied
+                  ? 'Permiso denegado. Ve a Configuración > Permisos.'
+                  : 'Se necesita permiso para acceder a ${source == ImageSource.camera ? "la cámara" : "la galería"}.',
+            ),
+            backgroundColor: Colors.redAccent,
+            action: status.isPermanentlyDenied
+                ? SnackBarAction(
+                    label: 'Configuración',
+                    textColor: Colors.white,
+                    onPressed: () => openAppSettings(),
+                  )
+                : null,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 800,
+      );
+
+      if (picked != null && mounted) {
+        final file = File(picked.path);
+        if (await file.exists()) {
+          setState(() => _imagenMascota = file);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error al seleccionar imagen: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ocurrió un error al seleccionar la imagen.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _seleccionarFecha() async {
@@ -100,6 +263,7 @@ class _MascotaScreenState extends State<MascotaScreen>
       breed: _razaController.text.trim(),
       birthDate: _fechaNacimiento!.millisecondsSinceEpoch,
       sex: _sexo!,
+      photoPath: Value(_imagenMascota?.path), // ← guarda la ruta en la BD
     ));
 
     if (!mounted) return;
@@ -145,8 +309,7 @@ class _MascotaScreenState extends State<MascotaScreen>
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -213,6 +376,58 @@ class _MascotaScreenState extends State<MascotaScreen>
     );
   }
 
+  Widget _buildAvatar() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFE8F0F8),
+            border: _imagenMascota != null
+                ? Border.all(color: const Color(0xFF1A3E6E), width: 2.5)
+                : null,
+          ),
+          child: ClipOval(
+            child: _imagenMascota != null
+                ? Image.file(_imagenMascota!, fit: BoxFit.cover)
+                : Image.asset(
+                    'assets/mascota_placeholder.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.pets,
+                      size: 60,
+                      color: Color(0xFF1A3E6E),
+                    ),
+                  ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          right: -8,
+          child: GestureDetector(
+            onTap: _seleccionarFoto,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF1A3E6E),
+              ),
+              child: const Icon(
+                Icons.camera_alt_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBackground() {
     return Stack(
       children: [
@@ -258,53 +473,6 @@ class _MascotaScreenState extends State<MascotaScreen>
         shape: BoxShape.circle,
         color: const Color(0xFF5B9BD5).withOpacity(opacity),
       ),
-    );
-  }
-
-  Widget _buildAvatar() {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFFE8F0F8),
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/mascota_placeholder.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.pets,
-                size: 60,
-                color: Color(0xFF1A3E6E),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 0,
-          right: -8,
-          child: GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF1A3E6E),
-              ),
-              child: const Icon(
-                Icons.camera_alt_outlined,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -354,8 +522,7 @@ class _MascotaScreenState extends State<MascotaScreen>
     return GestureDetector(
       onTap: _seleccionarFecha,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -363,11 +530,8 @@ class _MascotaScreenState extends State<MascotaScreen>
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.calendar_month_outlined,
-              color: Color(0xFF5B9BD5),
-              size: 22,
-            ),
+            const Icon(Icons.calendar_month_outlined,
+                color: Color(0xFF5B9BD5), size: 22),
             const SizedBox(width: 12),
             Text(
               _fechaNacimiento != null
@@ -418,26 +582,22 @@ class _MascotaScreenState extends State<MascotaScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              icon,
-              style: TextStyle(
-                fontSize: 20,
-                color: isSelected
-                    ? const Color(0xFF1A3E6E)
-                    : const Color(0xFF7A90A8),
-              ),
-            ),
+            Text(icon,
+                style: TextStyle(
+                  fontSize: 20,
+                  color: isSelected
+                      ? const Color(0xFF1A3E6E)
+                      : const Color(0xFF7A90A8),
+                )),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: isSelected
-                    ? const Color(0xFF1A3E6E)
-                    : const Color(0xFF7A90A8),
-              ),
-            ),
+            Text(label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? const Color(0xFF1A3E6E)
+                      : const Color(0xFF7A90A8),
+                )),
           ],
         ),
       ),
@@ -459,8 +619,7 @@ class _MascotaScreenState extends State<MascotaScreen>
                 backgroundColor: const Color(0xFF1A3E6E),
                 foregroundColor: Colors.white,
                 elevation: 4,
-                shadowColor:
-                    const Color(0xFF1A3E6E).withOpacity(0.4),
+                shadowColor: const Color(0xFF1A3E6E).withOpacity(0.4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -477,13 +636,9 @@ class _MascotaScreenState extends State<MascotaScreen>
                   : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Siguiente',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        Text('Siguiente',
+                            style: TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.w700)),
                         SizedBox(width: 8),
                         Icon(Icons.arrow_forward_rounded, size: 20),
                       ],

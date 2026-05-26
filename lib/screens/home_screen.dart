@@ -6,6 +6,8 @@ import 'package:tecnocan/screens/deposito_screen.dart';
 import 'package:tecnocan/screens/perfil_screen.dart';
 import 'perfil_mascota_screen.dart';
 // import 'dart:ui';
+import 'dart:io';
+import 'editar_alimento_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final int userId;
@@ -21,6 +23,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _countdown = '--:--';
 
   // Datos de BD
+  FeedingSchedule? _schedule;
+  List<FeedingTime> _times = [];
+
+  // User? _user;
   Pet? _pet;
   List<FeedingTime> _feedingTimes = [];
   bool _isLoading = true;
@@ -65,23 +71,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadData() async {
     final db = DatabaseProvider.of(context);
 
+    final user = await db.getUserById(widget.userId);
     final pets = await db.getPetsForUser(widget.userId);
+
     if (pets.isEmpty) {
       setState(() => _isLoading = false);
       return;
     }
+
     final pet = pets.first;
 
     final schedule = await db.getScheduleForPet(pet.id);
+
     List<FeedingTime> times = [];
+
     if (schedule != null) {
       times = await db.getTimesForSchedule(schedule.id);
     }
 
     if (!mounted) return;
+
     setState(() {
+      // _user = user;
       _pet = pet;
+
+      _schedule = schedule;
+      _times = times;
+
       _feedingTimes = times;
+
       _isLoading = false;
     });
 
@@ -185,7 +203,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   index: _currentTab,
                   children: [
                     _buildHomeContent(),
-                    const MascotaPerfilScreen(),
+                    MascotaPerfilScreen(
+                      petId: _pet!.id,
+                    ),
                     const DepositoScreen(),
                     PerfilScreen(userId: widget.userId)
                   ],
@@ -233,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _pet != null ? 'Hola 👋' : 'Bienvenido',
+                    _pet != null ? 'Hola' : 'Bienvenido',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -282,16 +302,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   shape: BoxShape.circle,
                   color: Colors.white.withOpacity(0.12),
                   border: Border.all(
-                      color: Colors.white.withOpacity(0.25), width: 2.5),
+                    color: Colors.white.withOpacity(0.25),
+                    width: 2.5,
+                  ),
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    'assets/logo.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Text('🐕', style: TextStyle(fontSize: 36)),
-                    ),
-                  ),
+                  child: _pet?.photoPath != null &&
+                          _pet!.photoPath!.isNotEmpty
+                      ? Image.file(
+                          File(_pet!.photoPath!),
+                          fit: BoxFit.cover,
+                          width: 72,
+                          height: 72,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Text(
+                              '🐕',
+                              style: TextStyle(fontSize: 36),
+                            ),
+                          ),
+                        )
+                      : Image.asset(
+                          'assets/logo.png',
+                          fit: BoxFit.cover,
+                          width: 72,
+                          height: 72,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Text(
+                              '🐕',
+                              style: TextStyle(fontSize: 36),
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -302,14 +343,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Text(
                       _pet?.name ?? 'Sin mascota',
                       style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white),
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
                     ),
                     Text(
                       _pet != null ? _petSubtitle(_pet!) : '',
                       style: const TextStyle(
-                          fontSize: 12, color: Colors.white54),
+                        fontSize: 12,
+                        color: Colors.white54,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -317,9 +361,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       runSpacing: 6,
                       children: [
                         _PetBadge(
-                            label: 'Dispensador activo', color: _green),
+                          label: 'Dispensador activo',
+                          color: _green,
+                        ),
                         _PetBadge(
-                          label: '${_feedingTimes.length} tomas hoy',
+                          label: '${_feedingTimes.length} tomas restantes hoy',
                           color: _accent,
                         ),
                       ],
@@ -332,10 +378,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const SizedBox(height: 16),
           Row(
             children: [
-              _PetStat(value: _totalGramsToday(), label: 'Hoy total'),
               _PetStat(
-                  value: '0/${_feedingTimes.length}', label: 'Tomas'),
-              const _PetStat(value: '2.1kg', label: 'En tolva'),
+                value: _totalGramsToday(),
+                label: 'Hoy total',
+              ),
+              _PetStat(
+                value: '0/${_feedingTimes.length}',
+                label: 'Tomas',
+              ),
             ],
           ),
         ],
@@ -404,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(50),
                         child: LinearProgressIndicator(
-                          value: 0.68,
+                          value: _nextMealProgress(),
                           backgroundColor: _navyLight,
                           valueColor:
                               const AlwaysStoppedAnimation(_navy2),
@@ -438,6 +488,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  double _nextMealProgress() {
+    final next = _nextMeal;
+
+    if (next == null) return 0;
+
+    final now = DateTime.now();
+
+    final parts = next.time.split(':');
+    final nextHour = int.parse(parts[0]);
+    final nextMinute = int.parse(parts[1]);
+
+    DateTime nextDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      nextHour,
+      nextMinute,
+    );
+
+    // si ya pasó hoy, usar mañana
+    if (nextDate.isBefore(now)) {
+      nextDate = nextDate.add(const Duration(days: 1));
+    }
+
+    // buscar comida anterior
+    final sorted = [..._feedingTimes];
+
+    sorted.sort((a, b) {
+      final aParts = a.time.split(':');
+      final bParts = b.time.split(':');
+
+      final aMinutes =
+          int.parse(aParts[0]) * 60 + int.parse(aParts[1]);
+
+      final bMinutes =
+          int.parse(bParts[0]) * 60 + int.parse(bParts[1]);
+
+      return aMinutes.compareTo(bMinutes);
+    });
+
+    FeedingTime previous = sorted.last;
+
+    for (int i = 0; i < sorted.length; i++) {
+      if (sorted[i].id == next.id) {
+        previous = i == 0 ? sorted.last : sorted[i - 1];
+        break;
+      }
+    }
+
+    final prevParts = previous.time.split(':');
+
+    DateTime prevDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      int.parse(prevParts[0]),
+      int.parse(prevParts[1]),
+    );
+
+    if (prevDate.isAfter(nextDate)) {
+      prevDate = prevDate.subtract(const Duration(days: 1));
+    }
+
+    final total =
+        nextDate.difference(prevDate).inMinutes;
+
+    final current =
+        now.difference(prevDate).inMinutes;
+
+    double progress = current / total;
+
+    return progress.clamp(0.0, 1.0);
+  }
+
   // ─── SCHEDULE ─────────────────────────────────────────────────────────
   Widget _buildScheduleSection() {
     final now = DateTime.now();
@@ -451,25 +575,59 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _SectionHeader(title: 'Horarios del día'),
+              const _SectionHeader(
+                title: 'Horarios del día',
+              ),
+
               GestureDetector(
-                onTap: () {},
+                onTap: () async {
+                  if (_pet == null ||  _schedule == null) return;
+
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          EditAlimentoScreen(
+                        petId: _pet!.id,
+                        schedule: _schedule!,
+                        times: _times,
+                      ),
+                    ),
+                  );
+
+                  _loadData();
+                },
+
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+
                   decoration: BoxDecoration(
                     color: _navyLight,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius:
+                        BorderRadius.circular(12),
                   ),
+
                   child: const Row(
                     children: [
-                      Icon(Icons.add_rounded, size: 14, color: _navy2),
-                      SizedBox(width: 4),
-                      Text('Agregar',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: _navy2)),
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 16,
+                        color: _navy2,
+                      ),
+
+                      SizedBox(width: 6),
+
+                      Text(
+                        'Editar',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _navy2,
+                        ),
+                      ),
                     ],
                   ),
                 ),

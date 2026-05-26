@@ -44,104 +44,106 @@ class DepositoScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Column(
+                child: Stack(
                   children: [
-                    // Imagen
-                    Container(
-                      height: 250,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF2FA),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.asset(
-                          'assets/disp.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) {
-                            return const Center(
-                              child: Icon(
-                                Icons.pets,
-                                size: 120,
-                                color: navy,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    // Indicadores
-                    Row(
+                    Column(
                       children: [
-                        Expanded(
-                          child: _buildIndicator(
-                            title: 'Croqueta',
-                            percent: 0.45,
-                            color: const Color(0xFF9ED0FF),
+                        // Imagen
+                        SizedBox(
+                          height: 330,
+                          width: double.infinity,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: Image.asset(
+                              'assets/prototipo-frontal.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) {
+                                return Center(
+                                  child: Image.asset(
+                                    'assets/logo.png',
+                                    width: 120,
+                                    fit: BoxFit.contain,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
 
-                        const SizedBox(width: 20),
+                        const SizedBox(height: 28),
 
-                        Expanded(
-                          child: _buildIndicator(
-                            title: 'Agua',
-                            percent: 0.85,
-                            color: navy,
+                        // Indicadores
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildIndicator(
+                                title: 'Croqueta',
+                                percent: 0.45,
+                                color: const Color(0xFF9ED0FF),
+                              ),
+                            ),
+
+                            const SizedBox(width: 20),
+
+                            Expanded(
+                              child: _buildIndicator(
+                                title: 'Agua',
+                                percent: 0.85,
+                                color: navy,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        // Estado
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F8FC),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Text(
+                            'Dispensador sincronizado y funcionando correctamente.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7A90),
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 28),
-
-                    // Estado
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F8FC),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Text(
-                        'Dispensador sincronizado y funcionando correctamente.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7A90),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Botón
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: navy,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                    // Botón flotante
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: GestureDetector(
+                        onTap: () {},
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.95),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                        ),
-                        child: const Text(
-                          'Actualizar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                          child: const Icon(
+                            Icons.refresh_rounded,
+                            color: navy,
+                            size: 24,
                           ),
                         ),
                       ),
@@ -171,9 +173,7 @@ class DepositoScreen extends StatelessWidget {
             color: navy,
           ),
         ),
-
         const SizedBox(height: 18),
-
         SizedBox(
           width: 120,
           height: 120,
@@ -190,7 +190,6 @@ class DepositoScreen extends StatelessWidget {
                   valueColor: AlwaysStoppedAnimation(color),
                 ),
               ),
-
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -202,9 +201,7 @@ class DepositoScreen extends StatelessWidget {
                       color: navy,
                     ),
                   ),
-
                   const SizedBox(height: 2),
-
                   const Text(
                     'Disponible',
                     style: TextStyle(

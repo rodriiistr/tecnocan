@@ -60,6 +60,9 @@ class AppDatabase extends _$AppDatabase {
   Future<Pet?> getPetById(int petId) =>
       (select(pets)..where((p) => p.id.equals(petId))).getSingleOrNull();
 
+  Future<bool> updatePet(Pet pet) =>
+    update(pets).replace(pet);    
+
   // ───────────── FEEDING SCHEDULES ─────────────
 
   Future<int> createSchedule(FeedingSchedulesCompanion schedule) =>
@@ -68,6 +71,23 @@ class AppDatabase extends _$AppDatabase {
   Future<FeedingSchedule?> getScheduleForPet(int petId) =>
       (select(feedingSchedules)..where((s) => s.petId.equals(petId)))
           .getSingleOrNull();
+
+  Future<bool> updateSchedule(
+    FeedingSchedule schedule,
+  ) =>
+      update(feedingSchedules).replace(schedule);
+
+  Future<bool> updateFeedingTime(
+    FeedingTime time,
+  ) =>
+      update(feedingTimes).replace(time);
+
+  Future<void> deleteTimesForSchedule(
+    int scheduleId,
+  ) =>
+      (delete(feedingTimes)
+            ..where((t) => t.scheduleId.equals(scheduleId)))
+          .go();
 
   // ───────────── FEEDING TIMES ─────────────
 

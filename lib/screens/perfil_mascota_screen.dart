@@ -1,8 +1,28 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:tecnocan/data/app_database.dart';
+import 'package:tecnocan/data/database_provider.dart';
 
-class MascotaPerfilScreen extends StatelessWidget {
-  const MascotaPerfilScreen({super.key});
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:drift/drift.dart' show Value;
 
+class MascotaPerfilScreen extends StatefulWidget {
+  final int petId;
+
+  const MascotaPerfilScreen({
+    super.key,
+    required this.petId,
+  });
+
+  @override
+  State<MascotaPerfilScreen> createState() =>
+      _MascotaPerfilScreenState();
+}
+
+class _MascotaPerfilScreenState
+    extends State<MascotaPerfilScreen> {
   // ───────────────── COLORS ─────────────────
   static const Color navy = Color(0xFF1A3E6E);
   static const Color bg = Color(0xFFF4F7FB);
@@ -10,8 +30,79 @@ class MascotaPerfilScreen extends StatelessWidget {
   static const Color lightBlue = Color(0xFFE8F0F8);
   static const Color green = Color(0xFF35C76F);
 
+  Pet? _pet;
+  FeedingSchedule? _schedule;
+  List<FeedingTime> _times = [];
+
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadData);
+  }
+
+  Future<void> _loadData() async {
+    final db = DatabaseProvider.of(context);
+
+    final pet = await db.getPetById(widget.petId);
+
+    FeedingSchedule? schedule;
+    List<FeedingTime> times = [];
+
+    if (pet != null) {
+      schedule = await db.getScheduleForPet(pet.id);
+
+      if (schedule != null) {
+        times = await db.getTimesForSchedule(schedule.id);
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _pet = pet;
+      _schedule = schedule;
+      _times = times;
+      _loading = false;
+    });
+  }
+
+  String _calcularEdad() {
+    if (_pet == null) return '--';
+
+    final birth =
+        DateTime.fromMillisecondsSinceEpoch(
+      _pet!.birthDate,
+    );
+
+    final age =
+        DateTime.now().year - birth.year;
+
+    return '$age años';
+  }
+
+  String _formatDate() {
+    if (_pet == null) return '--';
+
+    final date =
+        DateTime.fromMillisecondsSinceEpoch(
+      _pet!.birthDate,
+    );
+
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: bg,
       body: CustomScrollView(
@@ -27,19 +118,28 @@ class MascotaPerfilScreen extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    'assets/perro.jpg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: navy,
-                      child: const Center(
-                        child: Icon(
-                          Icons.pets,
-                          size: 100,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                  GestureDetector(
+                    onTap: _cambiarFoto,
+                    child: _pet?.photoPath != null &&
+                            _pet!.photoPath!.isNotEmpty
+                        ? Image.file(
+                            File(_pet!.photoPath!),
+                            fit: BoxFit.cover,
+                          )
+                        : Image.asset(
+                            'assets/perro.jpg',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: navy,
+                              child: const Center(
+                                child: Icon(
+                                  Icons.pets,
+                                  size: 100,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
 
                   // overlay oscuro
@@ -56,6 +156,30 @@ class MascotaPerfilScreen extends StatelessWidget {
                     ),
                   ),
 
+                  // botón cambiar foto
+                  Positioned(
+                    bottom: 60,
+                    right: 20,
+                    child: GestureDetector(
+                      onTap: _cambiarFoto,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+
                   // info
                   Positioned(
                     left: 24,
@@ -64,9 +188,9 @@ class MascotaPerfilScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Max',
-                          style: TextStyle(
+                        Text(
+                          _pet?.name ?? 'Sin nombre',
+                          style: const TextStyle(
                             fontSize: 34,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
@@ -75,9 +199,9 @@ class MascotaPerfilScreen extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            _badge('Golden Retriever'),
+                            _badge(_pet?.breed ?? 'Sin raza'),
                             const SizedBox(width: 8),
-                            _badge('3 años'),
+                            _badge(_calcularEdad()),
                           ],
                         ),
                       ],
@@ -113,7 +237,7 @@ class MascotaPerfilScreen extends StatelessWidget {
                         Expanded(
                           child: _topStat(
                             'Comidas',
-                            '3 al día',
+                            '${_times.length} al día',
                             Icons.restaurant_rounded,
                           ),
                         ),
@@ -139,31 +263,25 @@ class MascotaPerfilScreen extends StatelessWidget {
                   _infoCard(
                     icon: Icons.pets_rounded,
                     title: 'Raza',
-                    value: 'Golden Retriever',
+                    value: _pet?.breed ?? '--',
                   ),
 
                   _infoCard(
                     icon: Icons.cake_rounded,
                     title: 'Fecha de nacimiento',
-                    value: '12/03/2023',
+                    value: _formatDate(),
                   ),
 
                   _infoCard(
                     icon: Icons.male_rounded,
                     title: 'Sexo',
-                    value: 'Macho',
+                    value: _pet?.sex ?? '--',
                   ),
 
                   _infoCard(
                     icon: Icons.color_lens_outlined,
                     title: 'Color',
-                    value: 'Dorado claro',
-                  ),
-
-                  _infoCard(
-                    icon: Icons.local_hospital_outlined,
-                    title: 'Última revisión',
-                    value: 'Hace 2 semanas',
+                    value: 'No especificado',
                   ),
 
                   const SizedBox(height: 22),
@@ -181,25 +299,17 @@ class MascotaPerfilScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _mealTile(
-                          'Desayuno',
-                          '08:00 AM',
-                          '100g',
-                          true,
-                        ),
-                        const SizedBox(height: 12),
-                        _mealTile(
-                          'Almuerzo',
-                          '01:00 PM',
-                          '100g',
-                          true,
-                        ),
-                        const SizedBox(height: 12),
-                        _mealTile(
-                          'Cena',
-                          '06:00 PM',
-                          '120g',
-                          false,
+                        ..._times.map(
+                          (time) => Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: 12),
+                            child: _mealTile(
+                              time.name,
+                              time.time,
+                              '${time.amount.toStringAsFixed(0)}g',
+                              false,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -216,7 +326,8 @@ class MascotaPerfilScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Notas',
@@ -228,9 +339,7 @@ class MascotaPerfilScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 10),
                         Text(
-                          'Max es una mascota muy activa y amigable. '
-                          'Se recomienda mantener horarios constantes '
-                          'de alimentación y supervisar el nivel de agua.',
+                          'La información de la mascota se sincroniza automáticamente con TecnoCan.',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -250,6 +359,115 @@ class MascotaPerfilScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _cambiarFoto() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(22),
+        ),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                const Text(
+                  'Cambiar foto',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: navy,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: navy,
+                  ),
+                  title: const Text('Tomar foto'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library_rounded,
+                    color: navy,
+                  ),
+                  title: const Text('Elegir de galería'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+  final permission =
+      source == ImageSource.camera
+          ? Permission.camera
+          : Permission.photos;
+
+  final status = await permission.request();
+
+  if (!status.isGranted) return;
+
+  final picker = ImagePicker();
+
+  final picked = await picker.pickImage(
+    source: source,
+    imageQuality: 80,
+    maxWidth: 1000,
+  );
+
+  if (picked == null || _pet == null) return;
+
+  final db = DatabaseProvider.of(context);
+
+  await db.updatePet(
+    _pet!.copyWith(
+      photoPath: Value(picked.path),
+    ),
+  );
+
+  final updatedPet =
+      await db.getPetById(_pet!.id);
+
+  if (!mounted) return;
+
+  setState(() {
+    _pet = updatedPet;
+  });
+}
 
   // ───────────────── WIDGETS ─────────────────
 
@@ -344,7 +562,8 @@ class MascotaPerfilScreen extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -403,10 +622,10 @@ class MascotaPerfilScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -427,7 +646,6 @@ class MascotaPerfilScreen extends StatelessWidget {
               ],
             ),
           ),
-
           Text(
             done ? 'Completada' : 'Pendiente',
             style: TextStyle(
