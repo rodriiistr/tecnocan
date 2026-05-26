@@ -1,14 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:tecnocan/data/app_database.dart';
+import 'package:tecnocan/data/database_provider.dart';
 
-class PerfilScreen extends StatelessWidget {
-  const PerfilScreen({super.key});
+class PerfilScreen extends StatefulWidget {
+  final int userId;
+  const PerfilScreen({super.key, required this.userId});
 
+  @override
+  State<PerfilScreen> createState() => _PerfilScreenState();
+}
+
+class _PerfilScreenState extends State<PerfilScreen> {
   static const Color _navy = Color(0xFF1A3E6E);
   static const Color _bg = Color(0xFFF4F7FB);
   static const Color _gray = Color(0xFF8A9BB0);
 
+  User? _user;
+  List<Pet> _pets = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    final db = DatabaseProvider.of(context);
+    final user = await db.getUserById(widget.userId);
+    final pets = await db.getPetsForUser(widget.userId);
+
+    if (!mounted) return;
+    setState(() {
+      _user = user;
+      _pets = pets;
+      _isLoading = false;
+    });
+  }
+
+  String get _nombreCompleto {
+    if (_user == null) return '';
+    final apellidoM = _user!.apellidoMaterno != null
+        ? ' ${_user!.apellidoMaterno}'
+        : '';
+    return '${_user!.nombre} ${_user!.apellidoPaterno}$apellidoM';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(
+          child: CircularProgressIndicator(color: _navy),
+        ),
+      );
+    }
+
+    if (_user == null) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(
+          child: Text(
+            'No se encontró el usuario',
+            style: TextStyle(color: _gray, fontSize: 15),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bg,
       body: Column(
@@ -22,7 +82,6 @@ class PerfilScreen extends StatelessWidget {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Título
                     const Text(
                       'Perfil',
                       style: TextStyle(
@@ -51,7 +110,7 @@ class PerfilScreen extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          // Foto
+                          // Avatar
                           Container(
                             width: 110,
                             height: 110,
@@ -66,25 +125,25 @@ class PerfilScreen extends StatelessWidget {
                               child: Image.asset(
                                 'assets/profile.jpg',
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) {
-                                  return Container(
-                                    color: const Color(0xFFE8EEF7),
-                                    child: const Icon(
-                                      Icons.person,
-                                      size: 60,
-                                      color: _navy,
-                                    ),
-                                  );
-                                },
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: const Color(0xFFE8EEF7),
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: _navy,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
 
                           const SizedBox(height: 18),
 
-                          const Text(
-                            'Andrés Gómez',
-                            style: TextStyle(
+                          // Nombre real
+                          Text(
+                            _nombreCompleto,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w800,
                               color: _navy,
@@ -94,44 +153,48 @@ class PerfilScreen extends StatelessWidget {
                           const SizedBox(height: 6),
 
                           const Text(
-                            'Usuario Premium',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: _gray,
-                            ),
+                            'Usuario TecnoCan',
+                            style: TextStyle(fontSize: 14, color: _gray),
                           ),
 
                           const SizedBox(height: 22),
 
-                          // Info cards
+                          // Email real
                           _buildInfoTile(
                             Icons.email_outlined,
                             'Correo',
-                            'andres@gmail.com',
+                            _user!.email,
                           ),
 
                           const SizedBox(height: 14),
 
-                          _buildInfoTile(
-                            Icons.phone_outlined,
-                            'Teléfono',
-                            '+52 961 123 4567',
-                          ),
-
-                          const SizedBox(height: 14),
-
+                          // Ubicación (si existe)
                           _buildInfoTile(
                             Icons.location_on_outlined,
                             'Ubicación',
-                            'Tuxtla Gutiérrez, Chiapas',
+                            _user!.location ?? 'No registrada',
                           ),
 
                           const SizedBox(height: 14),
 
+                          // Mascotas registradas
                           _buildInfoTile(
                             Icons.pets_outlined,
                             'Mascotas registradas',
-                            '2 mascotas',
+                            _pets.isEmpty
+                                ? 'Sin mascotas'
+                                : _pets.length == 1
+                                    ? '1 mascota (${_pets.first.name})'
+                                    : '${_pets.length} mascotas',
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Miembro desde
+                          _buildInfoTile(
+                            Icons.calendar_today_outlined,
+                            'Miembro desde',
+                            _formatFecha(_user!.createdAt),
                           ),
 
                           const SizedBox(height: 26),
@@ -140,7 +203,9 @@ class PerfilScreen extends StatelessWidget {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                // TODO: abrir pantalla de edición
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _navy,
                                 padding:
@@ -160,6 +225,36 @@ class PerfilScreen extends StatelessWidget {
                               ),
                             ),
                           ),
+
+                          const SizedBox(height: 14),
+
+                          // Botón cerrar sesión
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context)
+                                    .popUntil((route) => route.isFirst);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                side: BorderSide(
+                                    color: _navy.withOpacity(0.3)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cerrar sesión',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: _navy,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -173,11 +268,17 @@ class PerfilScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoTile(
-    IconData icon,
-    String title,
-    String value,
-  ) {
+  String _formatFecha(int epochMs) {
+    if (epochMs == 0) return 'Desconocido';
+    final dt = DateTime.fromMillisecondsSinceEpoch(epochMs);
+    const meses = [
+      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+      'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+    ];
+    return '${dt.day} ${meses[dt.month - 1]} ${dt.year}';
+  }
+
+  Widget _buildInfoTile(IconData icon, String title, String value) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -193,24 +294,16 @@ class PerfilScreen extends StatelessWidget {
               color: _navy.withOpacity(0.08),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              icon,
-              color: _navy,
-            ),
+            child: Icon(icon, color: _navy),
           ),
-
           const SizedBox(width: 14),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: _gray,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: _gray),
                 ),
                 const SizedBox(height: 4),
                 Text(

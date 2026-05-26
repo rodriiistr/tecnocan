@@ -14,6 +14,10 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  final _nombreController = TextEditingController();
+  final _apellidoPController = TextEditingController();
+  final _apellidoMController = TextEditingController();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -26,18 +30,30 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
+    _nombreController.dispose();
+    _apellidoPController.dispose();
+    _apellidoMController.dispose();
+
     _emailController.dispose();
     _passwordController.dispose();
+
     super.dispose();
   }
 
   Future<void> _register() async {
     FocusScope.of(context).unfocus();
 
+    final nombre = _nombreController.text.trim();
+    final apellidoP = _apellidoPController.text.trim();
+    final apellidoM = _apellidoMController.text.trim();
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (nombre.isEmpty ||
+        apellidoP.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty) {
       setState(() {
         _error = 'Completa todos los campos';
       });
@@ -64,10 +80,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
       final userId = await db.createUser(
         UsersCompanion.insert(
-          name: 'Usuario',
+          nombre: nombre,
+          apellidoPaterno: apellidoP,
+          apellidoMaterno: Value(apellidoM),
           email: email,
           password: password,
-          createdAt: Value(DateTime.now().millisecondsSinceEpoch),
+          createdAt: Value(
+            DateTime.now().millisecondsSinceEpoch,
+          ),
         ),
       );
 
@@ -80,12 +100,12 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       );
     } catch (e) {
-        print(e);
+      print(e);
 
-        setState(() {
-          _error = e.toString();
-        });
-      }
+      setState(() {
+        _error = e.toString();
+      });
+    }
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -134,6 +154,37 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: 34),
 
+              // ─── NOMBRE ─────────────────────────────
+              _label('Nombre'),
+              _field(
+                controller: _nombreController,
+                hint: 'Rodrigo',
+                icon: Icons.person_outline_rounded,
+              ),
+
+              const SizedBox(height: 18),
+
+              // ─── APELLIDO PATERNO ──────────────────
+              _label('Apellido paterno'),
+              _field(
+                controller: _apellidoPController,
+                hint: 'González',
+                icon: Icons.badge_outlined,
+              ),
+
+              const SizedBox(height: 18),
+
+              // ─── APELLIDO MATERNO ──────────────────
+              _label('Apellido materno'),
+              _field(
+                controller: _apellidoMController,
+                hint: 'López',
+                icon: Icons.badge_outlined,
+              ),
+
+              const SizedBox(height: 18),
+
+              // ─── CORREO ────────────────────────────
               _label('Correo'),
               _field(
                 controller: _emailController,
@@ -144,6 +195,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: 18),
 
+              // ─── PASSWORD ──────────────────────────
               _label('Contraseña'),
               _field(
                 controller: _passwordController,
@@ -153,7 +205,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 suffix: IconButton(
                   onPressed: () {
                     setState(() {
-                      _obscurePassword = !_obscurePassword;
+                      _obscurePassword =
+                          !_obscurePassword;
                     });
                   },
                   icon: Icon(
@@ -182,19 +235,22 @@ class _SignupScreenState extends State<SignupScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
+                  onPressed:
+                      _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _navy,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius:
+                          BorderRadius.circular(16),
                     ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           height: 22,
                           width: 22,
-                          child: CircularProgressIndicator(
+                          child:
+                              CircularProgressIndicator(
                             color: Colors.white,
                             strokeWidth: 2,
                           ),
@@ -217,7 +273,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const LoginScreen(),
+                        builder: (_) =>
+                            const LoginScreen(),
                       ),
                     );
                   },
@@ -233,7 +290,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           text: 'Inicia sesión',
                           style: TextStyle(
                             color: _navy,
-                            fontWeight: FontWeight.w700,
+                            fontWeight:
+                                FontWeight.w700,
                           ),
                         ),
                       ],
@@ -268,7 +326,8 @@ class _SignupScreenState extends State<SignupScreen> {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
-    TextInputType keyboard = TextInputType.text,
+    TextInputType keyboard =
+        TextInputType.text,
     bool obscure = false,
     Widget? suffix,
   }) {
@@ -285,19 +344,23 @@ class _SignupScreenState extends State<SignupScreen> {
         suffixIcon: suffix,
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius:
+              BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius:
+              BorderRadius.circular(16),
           borderSide: const BorderSide(
             color: Color(0xFFD9E3EE),
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius:
+              BorderRadius.circular(16),
           borderSide: const BorderSide(
             color: _navy,
             width: 1.5,

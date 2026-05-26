@@ -21,19 +21,32 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  static const VerificationMeta _nombreMeta = const VerificationMeta('nombre');
   @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
+  late final GeneratedColumn<String> nombre = GeneratedColumn<String>(
+    'nombre',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  static const VerificationMeta _apellidoPaternoMeta = const VerificationMeta(
+    'apellidoPaterno',
+  );
   @override
-  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
-    'phone',
+  late final GeneratedColumn<String> apellidoPaterno = GeneratedColumn<String>(
+    'apellido_paterno',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _apellidoMaternoMeta = const VerificationMeta(
+    'apellidoMaterno',
+  );
+  @override
+  late final GeneratedColumn<String> apellidoMaterno = GeneratedColumn<String>(
+    'apellido_materno',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -86,8 +99,9 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
   @override
   List<GeneratedColumn> get $columns => [
     id,
-    name,
-    phone,
+    nombre,
+    apellidoPaterno,
+    apellidoMaterno,
     location,
     email,
     password,
@@ -108,18 +122,32 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
-    if (data.containsKey('name')) {
+    if (data.containsKey('nombre')) {
       context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+        _nombreMeta,
+        nombre.isAcceptableOrUnknown(data['nombre']!, _nombreMeta),
       );
     } else if (isInserting) {
-      context.missing(_nameMeta);
+      context.missing(_nombreMeta);
     }
-    if (data.containsKey('phone')) {
+    if (data.containsKey('apellido_paterno')) {
       context.handle(
-        _phoneMeta,
-        phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
+        _apellidoPaternoMeta,
+        apellidoPaterno.isAcceptableOrUnknown(
+          data['apellido_paterno']!,
+          _apellidoPaternoMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_apellidoPaternoMeta);
+    }
+    if (data.containsKey('apellido_materno')) {
+      context.handle(
+        _apellidoMaternoMeta,
+        apellidoMaterno.isAcceptableOrUnknown(
+          data['apellido_materno']!,
+          _apellidoMaternoMeta,
+        ),
       );
     }
     if (data.containsKey('location')) {
@@ -163,13 +191,17 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
-      name: attachedDatabase.typeMapping.read(
+      nombre: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}name'],
+        data['${effectivePrefix}nombre'],
       )!,
-      phone: attachedDatabase.typeMapping.read(
+      apellidoPaterno: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}phone'],
+        data['${effectivePrefix}apellido_paterno'],
+      )!,
+      apellidoMaterno: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}apellido_materno'],
       ),
       location: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -198,16 +230,18 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
 
 class User extends DataClass implements Insertable<User> {
   final int id;
-  final String name;
-  final String? phone;
+  final String nombre;
+  final String apellidoPaterno;
+  final String? apellidoMaterno;
   final String? location;
   final String email;
   final String password;
   final int createdAt;
   const User({
     required this.id,
-    required this.name,
-    this.phone,
+    required this.nombre,
+    required this.apellidoPaterno,
+    this.apellidoMaterno,
     this.location,
     required this.email,
     required this.password,
@@ -217,9 +251,10 @@ class User extends DataClass implements Insertable<User> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['name'] = Variable<String>(name);
-    if (!nullToAbsent || phone != null) {
-      map['phone'] = Variable<String>(phone);
+    map['nombre'] = Variable<String>(nombre);
+    map['apellido_paterno'] = Variable<String>(apellidoPaterno);
+    if (!nullToAbsent || apellidoMaterno != null) {
+      map['apellido_materno'] = Variable<String>(apellidoMaterno);
     }
     if (!nullToAbsent || location != null) {
       map['location'] = Variable<String>(location);
@@ -233,10 +268,11 @@ class User extends DataClass implements Insertable<User> {
   UsersCompanion toCompanion(bool nullToAbsent) {
     return UsersCompanion(
       id: Value(id),
-      name: Value(name),
-      phone: phone == null && nullToAbsent
+      nombre: Value(nombre),
+      apellidoPaterno: Value(apellidoPaterno),
+      apellidoMaterno: apellidoMaterno == null && nullToAbsent
           ? const Value.absent()
-          : Value(phone),
+          : Value(apellidoMaterno),
       location: location == null && nullToAbsent
           ? const Value.absent()
           : Value(location),
@@ -253,8 +289,9 @@ class User extends DataClass implements Insertable<User> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return User(
       id: serializer.fromJson<int>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      phone: serializer.fromJson<String?>(json['phone']),
+      nombre: serializer.fromJson<String>(json['nombre']),
+      apellidoPaterno: serializer.fromJson<String>(json['apellidoPaterno']),
+      apellidoMaterno: serializer.fromJson<String?>(json['apellidoMaterno']),
       location: serializer.fromJson<String?>(json['location']),
       email: serializer.fromJson<String>(json['email']),
       password: serializer.fromJson<String>(json['password']),
@@ -266,8 +303,9 @@ class User extends DataClass implements Insertable<User> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'name': serializer.toJson<String>(name),
-      'phone': serializer.toJson<String?>(phone),
+      'nombre': serializer.toJson<String>(nombre),
+      'apellidoPaterno': serializer.toJson<String>(apellidoPaterno),
+      'apellidoMaterno': serializer.toJson<String?>(apellidoMaterno),
       'location': serializer.toJson<String?>(location),
       'email': serializer.toJson<String>(email),
       'password': serializer.toJson<String>(password),
@@ -277,16 +315,20 @@ class User extends DataClass implements Insertable<User> {
 
   User copyWith({
     int? id,
-    String? name,
-    Value<String?> phone = const Value.absent(),
+    String? nombre,
+    String? apellidoPaterno,
+    Value<String?> apellidoMaterno = const Value.absent(),
     Value<String?> location = const Value.absent(),
     String? email,
     String? password,
     int? createdAt,
   }) => User(
     id: id ?? this.id,
-    name: name ?? this.name,
-    phone: phone.present ? phone.value : this.phone,
+    nombre: nombre ?? this.nombre,
+    apellidoPaterno: apellidoPaterno ?? this.apellidoPaterno,
+    apellidoMaterno: apellidoMaterno.present
+        ? apellidoMaterno.value
+        : this.apellidoMaterno,
     location: location.present ? location.value : this.location,
     email: email ?? this.email,
     password: password ?? this.password,
@@ -295,8 +337,13 @@ class User extends DataClass implements Insertable<User> {
   User copyWithCompanion(UsersCompanion data) {
     return User(
       id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      phone: data.phone.present ? data.phone.value : this.phone,
+      nombre: data.nombre.present ? data.nombre.value : this.nombre,
+      apellidoPaterno: data.apellidoPaterno.present
+          ? data.apellidoPaterno.value
+          : this.apellidoPaterno,
+      apellidoMaterno: data.apellidoMaterno.present
+          ? data.apellidoMaterno.value
+          : this.apellidoMaterno,
       location: data.location.present ? data.location.value : this.location,
       email: data.email.present ? data.email.value : this.email,
       password: data.password.present ? data.password.value : this.password,
@@ -308,8 +355,9 @@ class User extends DataClass implements Insertable<User> {
   String toString() {
     return (StringBuffer('User(')
           ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('phone: $phone, ')
+          ..write('nombre: $nombre, ')
+          ..write('apellidoPaterno: $apellidoPaterno, ')
+          ..write('apellidoMaterno: $apellidoMaterno, ')
           ..write('location: $location, ')
           ..write('email: $email, ')
           ..write('password: $password, ')
@@ -319,15 +367,24 @@ class User extends DataClass implements Insertable<User> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, phone, location, email, password, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    nombre,
+    apellidoPaterno,
+    apellidoMaterno,
+    location,
+    email,
+    password,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is User &&
           other.id == this.id &&
-          other.name == this.name &&
-          other.phone == this.phone &&
+          other.nombre == this.nombre &&
+          other.apellidoPaterno == this.apellidoPaterno &&
+          other.apellidoMaterno == this.apellidoMaterno &&
           other.location == this.location &&
           other.email == this.email &&
           other.password == this.password &&
@@ -336,16 +393,18 @@ class User extends DataClass implements Insertable<User> {
 
 class UsersCompanion extends UpdateCompanion<User> {
   final Value<int> id;
-  final Value<String> name;
-  final Value<String?> phone;
+  final Value<String> nombre;
+  final Value<String> apellidoPaterno;
+  final Value<String?> apellidoMaterno;
   final Value<String?> location;
   final Value<String> email;
   final Value<String> password;
   final Value<int> createdAt;
   const UsersCompanion({
     this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.phone = const Value.absent(),
+    this.nombre = const Value.absent(),
+    this.apellidoPaterno = const Value.absent(),
+    this.apellidoMaterno = const Value.absent(),
     this.location = const Value.absent(),
     this.email = const Value.absent(),
     this.password = const Value.absent(),
@@ -353,19 +412,22 @@ class UsersCompanion extends UpdateCompanion<User> {
   });
   UsersCompanion.insert({
     this.id = const Value.absent(),
-    required String name,
-    this.phone = const Value.absent(),
+    required String nombre,
+    required String apellidoPaterno,
+    this.apellidoMaterno = const Value.absent(),
     this.location = const Value.absent(),
     required String email,
     required String password,
     this.createdAt = const Value.absent(),
-  }) : name = Value(name),
+  }) : nombre = Value(nombre),
+       apellidoPaterno = Value(apellidoPaterno),
        email = Value(email),
        password = Value(password);
   static Insertable<User> custom({
     Expression<int>? id,
-    Expression<String>? name,
-    Expression<String>? phone,
+    Expression<String>? nombre,
+    Expression<String>? apellidoPaterno,
+    Expression<String>? apellidoMaterno,
     Expression<String>? location,
     Expression<String>? email,
     Expression<String>? password,
@@ -373,8 +435,9 @@ class UsersCompanion extends UpdateCompanion<User> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (phone != null) 'phone': phone,
+      if (nombre != null) 'nombre': nombre,
+      if (apellidoPaterno != null) 'apellido_paterno': apellidoPaterno,
+      if (apellidoMaterno != null) 'apellido_materno': apellidoMaterno,
       if (location != null) 'location': location,
       if (email != null) 'email': email,
       if (password != null) 'password': password,
@@ -384,8 +447,9 @@ class UsersCompanion extends UpdateCompanion<User> {
 
   UsersCompanion copyWith({
     Value<int>? id,
-    Value<String>? name,
-    Value<String?>? phone,
+    Value<String>? nombre,
+    Value<String>? apellidoPaterno,
+    Value<String?>? apellidoMaterno,
     Value<String?>? location,
     Value<String>? email,
     Value<String>? password,
@@ -393,8 +457,9 @@ class UsersCompanion extends UpdateCompanion<User> {
   }) {
     return UsersCompanion(
       id: id ?? this.id,
-      name: name ?? this.name,
-      phone: phone ?? this.phone,
+      nombre: nombre ?? this.nombre,
+      apellidoPaterno: apellidoPaterno ?? this.apellidoPaterno,
+      apellidoMaterno: apellidoMaterno ?? this.apellidoMaterno,
       location: location ?? this.location,
       email: email ?? this.email,
       password: password ?? this.password,
@@ -408,11 +473,14 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
+    if (nombre.present) {
+      map['nombre'] = Variable<String>(nombre.value);
     }
-    if (phone.present) {
-      map['phone'] = Variable<String>(phone.value);
+    if (apellidoPaterno.present) {
+      map['apellido_paterno'] = Variable<String>(apellidoPaterno.value);
+    }
+    if (apellidoMaterno.present) {
+      map['apellido_materno'] = Variable<String>(apellidoMaterno.value);
     }
     if (location.present) {
       map['location'] = Variable<String>(location.value);
@@ -433,8 +501,9 @@ class UsersCompanion extends UpdateCompanion<User> {
   String toString() {
     return (StringBuffer('UsersCompanion(')
           ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('phone: $phone, ')
+          ..write('nombre: $nombre, ')
+          ..write('apellidoPaterno: $apellidoPaterno, ')
+          ..write('apellidoMaterno: $apellidoMaterno, ')
           ..write('location: $location, ')
           ..write('email: $email, ')
           ..write('password: $password, ')
@@ -1865,8 +1934,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$UsersTableCreateCompanionBuilder =
     UsersCompanion Function({
       Value<int> id,
-      required String name,
-      Value<String?> phone,
+      required String nombre,
+      required String apellidoPaterno,
+      Value<String?> apellidoMaterno,
       Value<String?> location,
       required String email,
       required String password,
@@ -1875,8 +1945,9 @@ typedef $$UsersTableCreateCompanionBuilder =
 typedef $$UsersTableUpdateCompanionBuilder =
     UsersCompanion Function({
       Value<int> id,
-      Value<String> name,
-      Value<String?> phone,
+      Value<String> nombre,
+      Value<String> apellidoPaterno,
+      Value<String?> apellidoMaterno,
       Value<String?> location,
       Value<String> email,
       Value<String> password,
@@ -1920,13 +1991,18 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
+  ColumnFilters<String> get nombre => $composableBuilder(
+    column: $table.nombre,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get phone => $composableBuilder(
-    column: $table.phone,
+  ColumnFilters<String> get apellidoPaterno => $composableBuilder(
+    column: $table.apellidoPaterno,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get apellidoMaterno => $composableBuilder(
+    column: $table.apellidoMaterno,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1990,13 +2066,18 @@ class $$UsersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
+  ColumnOrderings<String> get nombre => $composableBuilder(
+    column: $table.nombre,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get phone => $composableBuilder(
-    column: $table.phone,
+  ColumnOrderings<String> get apellidoPaterno => $composableBuilder(
+    column: $table.apellidoPaterno,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get apellidoMaterno => $composableBuilder(
+    column: $table.apellidoMaterno,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -2033,11 +2114,18 @@ class $$UsersTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
+  GeneratedColumn<String> get nombre =>
+      $composableBuilder(column: $table.nombre, builder: (column) => column);
 
-  GeneratedColumn<String> get phone =>
-      $composableBuilder(column: $table.phone, builder: (column) => column);
+  GeneratedColumn<String> get apellidoPaterno => $composableBuilder(
+    column: $table.apellidoPaterno,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get apellidoMaterno => $composableBuilder(
+    column: $table.apellidoMaterno,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get location =>
       $composableBuilder(column: $table.location, builder: (column) => column);
@@ -2106,16 +2194,18 @@ class $$UsersTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String?> phone = const Value.absent(),
+                Value<String> nombre = const Value.absent(),
+                Value<String> apellidoPaterno = const Value.absent(),
+                Value<String?> apellidoMaterno = const Value.absent(),
                 Value<String?> location = const Value.absent(),
                 Value<String> email = const Value.absent(),
                 Value<String> password = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
               }) => UsersCompanion(
                 id: id,
-                name: name,
-                phone: phone,
+                nombre: nombre,
+                apellidoPaterno: apellidoPaterno,
+                apellidoMaterno: apellidoMaterno,
                 location: location,
                 email: email,
                 password: password,
@@ -2124,16 +2214,18 @@ class $$UsersTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
-                required String name,
-                Value<String?> phone = const Value.absent(),
+                required String nombre,
+                required String apellidoPaterno,
+                Value<String?> apellidoMaterno = const Value.absent(),
                 Value<String?> location = const Value.absent(),
                 required String email,
                 required String password,
                 Value<int> createdAt = const Value.absent(),
               }) => UsersCompanion.insert(
                 id: id,
-                name: name,
-                phone: phone,
+                nombre: nombre,
+                apellidoPaterno: apellidoPaterno,
+                apellidoMaterno: apellidoMaterno,
                 location: location,
                 email: email,
                 password: password,

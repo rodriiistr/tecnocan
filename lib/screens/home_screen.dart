@@ -5,7 +5,7 @@ import 'package:tecnocan/data/database_provider.dart';
 import 'package:tecnocan/screens/deposito_screen.dart';
 import 'package:tecnocan/screens/perfil_screen.dart';
 import 'perfil_mascota_screen.dart';
-import 'dart:ui';
+// import 'dart:ui';
 
 class HomeScreen extends StatefulWidget {
   final int userId;
@@ -187,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _buildHomeContent(),
                     const MascotaPerfilScreen(),
                     const DepositoScreen(),
-                    const PerfilScreen(),
+                    PerfilScreen(userId: widget.userId)
                   ],
                 ),
               ),
