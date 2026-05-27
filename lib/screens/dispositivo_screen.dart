@@ -4,6 +4,10 @@ import 'package:tecnocan/data/app_database.dart';
 import 'package:tecnocan/data/database_provider.dart';
 import 'home_screen.dart';
 
+// Conexión
+import 'package:tecnocan/services/device_discovery.dart';
+
+
 class DispositivoScreen extends StatefulWidget {
   final int petId;
 
@@ -32,9 +36,19 @@ class _DispositivoScreenState extends State<DispositivoScreen>
 
   static const Color _navy = Color(0xFF1A3E6E);
 
+  final DeviceDiscovery discovery = DeviceDiscovery();
+
+  String? _deviceIp;
+  bool _isSearchingDevice = false;
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      buscarDispositivo();
+
+  });
 
     _fadeController = AnimationController(
       vsync: this,
@@ -91,46 +105,80 @@ class _DispositivoScreenState extends State<DispositivoScreen>
     super.dispose();
   }
 
+  Future<void> buscarDispositivo() async {
+    setState(() {
+      _isSearchingDevice = true;
+    });
+
+    try {
+      // 🔥 aquí buscas el ESP32 en red local (AP)
+      final ip = await discovery.findEsp32();
+
+      if (!mounted) return;
+
+      setState(() {
+        _deviceIp = ip ?? '192.168.4.1'; // fallback típico ESP32 AP
+        _isSearchingDevice = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ip != null
+                ? "TecnoCan encontrado en $ip"
+                : "Usando conexión directa 192.168.4.1",
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _deviceIp = '192.168.4.1';
+        _isSearchingDevice = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Conexión AP activa (default)")),
+      );
+    }
+  }
+
   Future<void> _guardarYContinuar() async {
     setState(() => _isLoading = true);
 
     final db = DatabaseProvider.of(context);
 
-    // Guardar dispositivo
+    if (_deviceIp == null) {
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay dispositivo conectado'),
+        ),
+      );
+      return;
+    }
+
     await db.saveDevice(
       DevicesCompanion.insert(
         petId: widget.petId,
-        macAddress: 'PENDING',
+        macAddress: _deviceIp!, // 👈 aquí va IP del ESP32 AP
         nickname: const Value('Mi TecnoCan'),
-        connectedAt: Value(
-          DateTime.now().millisecondsSinceEpoch,
-        ),
+        connectedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
 
-    // Obtener mascota
     final pet = await db.getPetById(widget.petId);
 
     if (!mounted) return;
 
     setState(() => _isLoading = false);
 
-    // Si algo salió mal
-    if (pet == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo obtener la mascota'),
-        ),
-      );
-      return;
-    }
-
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => HomeScreen(
-          userId: pet.userId,
-        ),
+        builder: (_) => HomeScreen(userId: pet!.userId),
       ),
     );
   }
@@ -478,14 +526,18 @@ class _DispositivoScreenState extends State<DispositivoScreen>
 
               const SizedBox(width: 12),
 
-              const Text(
-                'Buscando dispositivo...',
+              Text(
+                _isSearchingDevice
+                    ? 'Buscando dispositivo...'
+                    : _deviceIp != null
+                        ? 'Dispositivo conectado'
+                        : 'No encontrado',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: _navy,
                 ),
-              ),
+              )
             ],
           ),
 
